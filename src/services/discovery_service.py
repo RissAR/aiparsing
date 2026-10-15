@@ -6,7 +6,7 @@ import time
 from typing import Callable, Optional
 from sqlalchemy.orm import Session
 
-from src.database.models import CompetitorOffer, Product
+from src.database.models import CompetitorOffer, Product, ProductMatch
 from src.services.prom_scraper import PromScraper
 
 logger = logging.getLogger(__name__)
@@ -83,6 +83,7 @@ class DiscoveryService:
                     existing.image_url = offer_data["image_url"]
                 if offer_data.get("external_id"):
                     existing.external_id = offer_data["external_id"]
+                offer_obj = existing
                 saved_count += 1
             else:
                 new_offer = CompetitorOffer(
@@ -97,7 +98,25 @@ class DiscoveryService:
                     scraped_at=datetime.now(timezone.utc),
                 )
                 db.add(new_offer)
+                db.flush()
+                offer_obj = new_offer
                 saved_count += 1
+
+            # Ensure ProductMatch link exists
+            match_link = (
+                db.query(ProductMatch)
+                .filter_by(product_id=product.id, competitor_offer_id=offer_obj.id)
+                .first()
+            )
+            if not match_link:
+                new_match = ProductMatch(
+                    product_id=product.id,
+                    competitor_offer_id=offer_obj.id,
+                    match_method="discovered",
+                    confidence_score=0.0,
+                    status="pending",
+                )
+                db.add(new_match)
 
         db.commit()
 

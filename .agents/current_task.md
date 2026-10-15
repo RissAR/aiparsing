@@ -1,28 +1,30 @@
-# ТЗ №3: Модуль пошуку та збору конкурентів на Prom.ua (Discovery & Scraping)
+# ТЗ №4: Інтелектуальний модуль зіставлення товарів (AI & Fuzzy Matching Engine)
 
 ## Мета
-Реалізувати скрапер публічної пошукової видачі Prom.ua на основі стабільних селекторів `data-qaid` та сервіс пошуку конкурентів (`DiscoveryService`), який бере наші товари з БД `products`, знаходить за ними відповідні пропозиції на Prom.ua та зберігає їх у таблицю `competitor_offers`.
+Реалізувати дворівневий модуль зіставлення (Level 1: швидкий fuzzy/rule-based фільтр + Level 2: AI-арбітр на базі Google Gemini 2.5 Flash), який порівнює наші товари з зібраними пропозиціями конкурентів, оцінює відсоток впевненості (`confidence_score` 0.0 - 1.0) та заповнює таблицю `product_matches`.
 
 ---
 
 ## Стек технологій та залежності
-- **HTTP-клієнт:** `httpx>=0.27.0` (додати до `requirements.txt`)
-- **HTML-парсинг:** `lxml>=5.0.0` (використовуємо `lxml.html`)
-- **База даних:** SQLAlchemy 2.0+ (`Product`, `CompetitorOffer`)
-- **CLI:** `argparse`
+- **Fuzzy Matching:** `rapidfuzz>=3.0.0`
+- **AI SDK:** `google-genai>=0.1.0`
+- **Модель AI:** `gemini-2.5-flash` (ключ береться з `.env`)
+- **База даних:** SQLAlchemy (`Product`, `CompetitorOffer`, `ProductMatch`)
 
 ---
 
 ## Структура файлів до створення / модифікації
 ```text
 /home/dofi/Dev/aiparsing/
-├── requirements.txt                   # Додати httpx>=0.27.0
+├── requirements.txt                   # Додати rapidfuzz>=3.0.0 та google-genai>=0.1.0
 ├── src/
+│   ├── config.py                      # Додати параметри GEMINI_API_KEY, GEMINI_MODEL
 │   └── services/
-│       ├── prom_scraper.py            # HTTP-клієнт та парсер HTML-видачі Prom.ua
-│       └── discovery_service.py       # Оркестратор пошуку для товарів з БД
+│       ├── discovery_service.py       # Додати створення ProductMatch зв'язки при збереженні оферів
+│       ├── ai_matcher.py              # Клієнт Google Gemini для порівняння товарів у JSON форматі
+│       └── matching_engine.py         # Дворівневий оркестратор зіставлення (Rules + Fuzzy + AI)
 └── scripts/
-    └── discover_competitors.py        # CLI скрипт для запуску пошуку конкурентів
+    └── match_products.py              # CLI скрипт для запуску процесу матчингу
 ```
 
 ---
@@ -31,61 +33,81 @@
 
 ### 1. Оновлення `requirements.txt`
 Додати:
-- `httpx>=0.27.0`
+- `rapidfuzz>=3.0.0`
+- `google-genai>=0.1.0`
 
-### 2. Скрапер Prom.ua `src/services/prom_scraper.py`
-Створити клас `PromScraper`:
-- **Конфігурація запиту:**
-  - `User-Agent`: актуальний браузерний рядок (наприклад, `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36`).
-  - `Accept-Language`: `uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7`.
-  - Таймаут запиту: 10–15 секунд.
-- **Метод `search(query: str, max_results: int = 5) -> list[dict]`:**
-  - URL пошуку: `https://prom.ua/ua/search?search_term={quote(query)}`.
-  - Парсинг HTML через `lxml.html.fromstring`.
-  - Пошук блоків карток за XPath: `//*[@data-qaid="product_block"]`.
-  - Для кожного блоку витягнути:
-    1. **Назва товару:** `.//[@data-qaid="product_name"]` (текст).
-    2. **Ціна:** `.//*[@data-qaid="product_price"]` — очистити від пробілів, нерозривних пробілів `\xa0` та знака `₴`, перетворити у `float`. Якщо ціну не вдалося розпарсити — пропускати.
-    3. **Продавець:** `.//*[@data-qaid="company_name"]` (текст).
-    4. **Наявність:** `.//*[@data-qaid="product_presence"]` (перевірка чи містить слова `наявності`, `відправки`, `в наявності` $\rightarrow$ `is_in_stock: bool`).
-    5. **Посилання:** `.//*[@data-qaid="product_link"]/@href` або fallback `.//a[contains(@href, "/p")]/@href` $\rightarrow$ нормалізувати через `urllib.parse.urljoin("https://prom.ua", href)`.
-    6. **Зображення:** `.//img/@src` (якщо є).
-    7. **External ID:** витягнути з URL або data-атрибутів (наприклад, число після `-p` або параметр `?p=...`).
-  - Повертати список словників `RawCompetitorOffer` розміром до `max_results`.
-  - Безпечна обробка помилок (HTTP 4xx/5xx або таймаут не повинні викидати фатальний виняток, а повертати пустий список та логувати попередження).
+### 2. Оновлення `src/config.py`
+Додати зчитування параметрів для Gemini:
+- `gemini_api_key: Optional[str] = None` (зчитується з `GEMINI_API_KEY` або `.env`)
+- `gemini_model: str = "gemini-2.5-flash"` (зчитується з `GEMINI_MODEL` або дефолт)
 
-### 3. Сервіс Discovery `src/services/discovery_service.py`
-Створити клас `DiscoveryService`:
-- **Метод `discover_for_product(db: Session, product: Product, max_offers: int = 5) -> int`:**
-  - Формує пошуковий запит: якщо є валідний артикул `product.sku` (не порожній) — шукати за комбінацією `SKU` або за `title` (очищеним від зайвих символів).
-  - Викликає `PromScraper.search(query, max_results=max_offers)`.
-  - Для кожної знайденої пропозиції:
-    - Перевіряє, чи вже існує запис у `competitor_offers` для даного `product_id` з таким самим `url`.
-    - Якщо існує — оновлює `price`, `is_in_stock`, `scraped_at`.
-    - Якщо новий — створює новий запис `CompetitorOffer`.
-  - Зберігає зміни в БД (`db.commit()`).
-  - Повертає кількість збережених/оновлених оферів.
-- **Метод `discover_all(db: Session, limit_products: int = None, offers_per_product: int = 5, delay_seconds: float = 1.0)`:**
-  - Проходить по активних товарах (`is_active == True`) з обмеженням `limit_products`.
-  - Між запитами робить `time.sleep(delay_seconds)` для захисту від блокування.
+### 3. Оновлення `src/services/discovery_service.py`
+- При знаходженні пропозиції для `product`:
+  - Крім збереження/оновлення `CompetitorOffer`, перевіряти наявність запису `ProductMatch(product_id=product.id, competitor_offer_id=offer.id)`.
+  - Якщо зв'язки немає — створювати запис `ProductMatch` зі статусом `pending`, `confidence_score=0.0`, `match_method="discovered"`.
+  - Якщо вже існує — залишати без змін.
+- Забезпечити збереження в БД.
 
-### 4. CLI скрипт `scripts/discover_competitors.py`
-Аргументи командного рядка:
-- `--limit`: кількість товарів з каталогу для обробки (за замовчуванням `3`, для повного прогону можна передати більше).
-- `--offers-per-product`: скільки конкурентів збирати для кожного товару (за замовчуванням `5`).
-- `--delay`: пауза між товарами в секундах (за замовчуванням `1.5`).
-- Інформативний вивід у консоль:
+### 4. Модуль AI-зіставлення `src/services/ai_matcher.py`
+Створити клас `GeminiMatcher`:
+- Ініціалізується з `api_key` та `model_name`.
+- **Метод `compare(our_title: str, our_sku: str, our_price: float, comp_title: str, comp_price: float) -> dict`:**
+  - Якщо `api_key` відсутній — повертає `{"is_same_product": False, "confidence": 0.5, "reasoning": "Gemini API key not configured"}`.
+  - Формує запит до моделі порівняти товар нашого магазину і товар конкурента.
+  - Використовує структурований JSON-вихід (`response_mime_type="application/json"`).
+  - Очікувана схема відповіді:
+    ```json
+    {
+      "is_same_product": true,
+      "confidence": 0.95,
+      "reasoning": "Пояснення українською мовою щодо відповідності моделі, ємності, кольору тощо."
+    }
+    ```
+  - Обробляє можливі помилки запиту та таймаути (fallback на safe default).
+
+### 5. Сервіс матчингу `src/services/matching_engine.py`
+Створити клас `MatchingEngine`:
+- **Логіка оцінки відповідності (`evaluate_match(product: Product, offer: CompetitorOffer, force_ai: bool = False) -> MatchResult`):**
+  1. **Крок A (Exact SKU / Артикул):**
+     - Якщо `product.sku` (довжиною >= 3 символи) присутній у `offer.title` (case-insensitive):
+       $\rightarrow$ `confidence = 0.98`, `method = "exact_sku"`, `reasoning = f"Точний збіг артикулу {product.sku}"`.
+  2. **Крок B (Rule-based невідповідності):**
+     - Перевірка несумісності ключових чисел: якщо у нашого товару є потужність (наприклад `100W`), а у конкурента явно інша (наприклад `65W`) $\rightarrow$ `confidence = 0.15`, `method = "rule_based"`, `reasoning = "Невідповідність ключових характеристик (потужність/модель)"`.
+     - Якщо різні бренди (наприклад наш Baseus, а у конкурента Xiaomi або Hoco) $\rightarrow$ `confidence = 0.10`, `method = "rule_based"`, `reasoning = "Різні бренди"`.
+  3. **Крок C (Текстовий Fuzzy-аналіз через `rapidfuzz`):**
+     - Розрахунок `similarity = rapidfuzz.fuzz.token_set_ratio(product.title, offer.title) / 100.0`.
+     - Якщо `similarity >= 0.90` $\rightarrow$ `confidence = similarity`, `method = "fuzzy_title"`.
+  4. **Крок D (AI Арбітр через `GeminiMatcher`):**
+     - Якщо оцінка знаходиться в «сірій зоні» (`0.45 <= similarity < 0.90`) або якщо передано `force_ai=True`:
+       - Викликається `GeminiMatcher.compare(...)`.
+       - Береться `confidence` та `reasoning` від моделі, `method = "ai_gemini"`.
+  5. **Крок E (Фінальний статус):**
+     - `status = "approved"` якщо `confidence >= 0.80` та `offer.is_in_stock == True`.
+     - `status = "rejected"` якщо `confidence < 0.50` або `is_same_product == False`.
+     - `status = "pending"` у проміжних випадках.
+- **Метод `process_pending_matches(db: Session, force_ai: bool = False) -> list[ProductMatch]`:**
+  - Знаходить усі `ProductMatch` зі статусом `pending` (або створює їх для існуючих зв'язок, якщо ще не створені).
+  - Запускає `evaluate_match`, оновлює поля `confidence_score`, `match_method`, `status`, `ai_reasoning`.
+  - Зберігає зміни в БД.
+
+### 6. CLI скрипт `scripts/match_products.py`
+- Аргументи:
+  - `--force-ai`: примусово опитувати Gemini для всіх кандидатів (за замовчуванням тільки для спірних або без точного SKU).
+  - `--link-existing`: перед матчингом автоматично створити записи `ProductMatch` для вже зібраних `CompetitorOffer`, якщо вони ще не прив'язані.
+- Вивід у консоль гарної підсумкової таблиці:
   ```text
-  Запуск пошуку конкурентів на Prom.ua...
-  Товарів до обробки: 3 | Оферів на товар: 5 | Затримка: 1.5s
-  ------------------------------------------------------------
-  [1/3] Наш товар: Павербанк Baseus Blade 100W 20000mAh Black (SKU: PPDGL-01)
-        Пошуковий запит: 'PPDGL-01'
-        -> Знайдено оферів: 5
-        -> Збережено в базу (діапазон цін: 3299.0 - 4043.0 UAH)
-  [2/3] ...
-  ------------------------------------------------------------
-  Пошук завершено. Всього зібрано пропозицій: 15
+  Запуск оцінки відповідності товарів (Matching Engine)...
+  --------------------------------------------------------------------------------------------------------
+  Наш товар: Павербанк Baseus Blade 100W 20000mAh Black (PPDGL-01)
+    [98%] APPROVED (exact_sku): УМБ Baseus PPDGL-01 20000mAh, 100W (4043.0 грн)
+          -> Точний збіг артикулу PPDGL-01
+    [15%] REJECTED (rule_based): Повербанк Baseus Blade H1 65W 20000mAh (3299.0 грн)
+          -> Невідповідність характеристик (65W vs 100W)
+    [95%] APPROVED (ai_gemini): Павербанк Baseus Blade Digital Display 20000 mAh PD 100W Black (3324.0 грн)
+          -> Обидва товари ідентичні: модель Baseus Blade 100W 20000mAh
+  --------------------------------------------------------------------------------------------------------
+  Всього оброблено зв'язок: 11
+  Схвалено (Approved): 4 | Відхилено (Rejected): 6 | На ручній перевірці (Pending): 1
   ```
 
 ---
@@ -95,22 +117,21 @@
    ```bash
    venv/bin/pip install -r requirements.txt
    ```
-2. Запуск збору для перших 3-х товарів:
+2. Запуск матчингу:
    ```bash
-   venv/bin/python scripts/discover_competitors.py --limit 3 --offers-per-product 5 --delay 1.0
+   venv/bin/python scripts/match_products.py --link-existing
    ```
-3. Перевірка збереження даних у БД:
-   Виконати перевірочний однорядковий скрипт:
+3. Перевірка бази даних:
    ```bash
-   venv/bin/python -c "from src.database.connection import SessionLocal; from src.database.models import CompetitorOffer; db = SessionLocal(); count = db.query(CompetitorOffer).count(); print(f'Total competitor offers in DB: {count}'); assert count > 0; db.close()"
+   venv/bin/python -c "from src.database.connection import SessionLocal; from src.database.models import ProductMatch; db = SessionLocal(); matches = db.query(ProductMatch).all(); print(f'Total matches in DB: {len(matches)}'); [print(f'[{m.status.upper()}] {m.confidence_score*100:.0f}% ({m.match_method}): {m.ai_reasoning[:60]}...') for m in matches[:5]]; assert len(matches) > 0; db.close()"
    ```
-   *Очікуваний результат:* у таблиці `competitor_offers` з'явилося > 0 записів з реальними цінами та посиланнями.
+   *Очікуваний результат:* у таблиці `product_matches` з'явилися записи зі статусами `approved` та `rejected`, заповненими `confidence_score` та детальним обґрунтуванням `ai_reasoning`.
 
 ---
 
 ## Формат звіту після виконання
 1. Список створених/модифікованих файлів.
-2. Лог виконання команди `discover_competitors.py`.
-3. Результат перевірки кількості записів у БД.
+2. Лог виконання команди `scripts/match_products.py --link-existing`.
+3. Результат перевірки бази даних.
 4. Єдина команда для git фіксації:
-   `git add . && git commit -m "feat: implement Prom.ua scraper and competitor discovery service" && git push origin main`
+   `git add . && git commit -m "feat: implement hybrid AI and fuzzy matching engine with Gemini" && git push origin main`
