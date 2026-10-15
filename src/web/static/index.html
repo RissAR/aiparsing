@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="uk" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Repricer // Prom.ua Intelligence</title>
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#1e293b">
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              dark: '#0b1120',
+              card: '#131d31',
+              border: '#1e293b',
+              accent: '#38bdf8',
+              purple: '#818cf8',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <style>
+    body {
+      background-color: #0b1120;
+      color: #f1f5f9;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      height: 6px;
+      width: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#0b1120]">
+
+  <!-- Top Navigation / Header -->
+  <header class="border-b border-slate-800 bg-[#0f172a]/80 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
+          <i data-lucide="zap" class="w-6 h-6 text-white"></i>
+        </div>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">
+            AI Repricer
+          </h1>
+          <p class="text-xs text-slate-400 tracking-wider uppercase font-semibold">Prom.ua Intelligence</p>
+        </div>
+      </div>
+
+      <!-- Status Badges -->
+      <div class="flex items-center space-x-3 text-xs">
+        <div class="hidden sm:flex items-center space-x-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span>БД: Підключено</span>
+        </div>
+        <div class="flex items-center space-x-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-medium">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+          <span>Gemini 2.5 Flash</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- Action Bar -->
+    <div class="bg-[#131d31] p-4 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-xl shadow-black/20">
+      <div class="flex flex-wrap items-center gap-2.5">
+        <!-- Main Autopilot Button -->
+        <button id="btn-run-all" onclick="triggerAction('run-all', 'Повний автопілот запущено...')" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]">
+          <i data-lucide="rocket" class="w-4 h-4"></i>
+          <span>Запустити повний автопілот</span>
+        </button>
+
+        <!-- Sub Actions -->
+        <button id="btn-discover" onclick="triggerAction('discover', 'Збір оферів з Prom.ua...')" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-cyan-400"></i>
+          <span>Зібрати Prom</span>
+        </button>
+        <button id="btn-match" onclick="triggerAction('match', 'AI-зіставлення через Gemini...')" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+          <i data-lucide="bot" class="w-3.5 h-3.5 text-purple-400"></i>
+          <span>AI-Матчинг</span>
+        </button>
+        <button id="btn-reprice" onclick="triggerAction('reprice', 'Перерахунок рекомендованих цін...')" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+          <i data-lucide="calculator" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span>Перерахувати ціни</span>
+        </button>
+        <button id="btn-apply-all" onclick="triggerAction('apply-all', 'Застосування всіх схвалених цін...')" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition">
+          <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
+          <span>Застосувати всі ціни</span>
+        </button>
+      </div>
+
+      <!-- Export Button -->
+      <div>
+        <a href="/api/export/feed.xml" target="_blank" class="inline-flex items-center space-x-2 px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-cyan-400 text-xs font-semibold border border-cyan-500/30 hover:border-cyan-500/60 transition">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          <span>Завантажити XML для Prom.ua</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Metrics Cards (4 stats) -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Card 1 -->
+      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Каталог товарів</p>
+          <h3 id="stat-products" class="text-2xl font-bold text-white mt-1">--</h3>
+          <p class="text-[11px] text-slate-500 mt-0.5">Активні позиції магазину</p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400">
+          <i data-lucide="package" class="w-6 h-6"></i>
+        </div>
+      </div>
+
+      <!-- Card 2 -->
+      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Офери конкурентів</p>
+          <h3 id="stat-offers" class="text-2xl font-bold text-white mt-1">--</h3>
+          <p class="text-[11px] text-slate-500 mt-0.5">Знайдено на Prom.ua</p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-cyan-500/10 border border-cyan-500/20 flex items-center justify-center text-cyan-400">
+          <i data-lucide="users" class="w-6 h-6"></i>
+        </div>
+      </div>
+
+      <!-- Card 3 -->
+      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">AI Схвалено</p>
+          <h3 id="stat-matches" class="text-2xl font-bold text-white mt-1">--</h3>
+          <p class="text-[11px] text-slate-500 mt-0.5">Валідні зіставлення</p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+          <i data-lucide="check-circle" class="w-6 h-6"></i>
+        </div>
+      </div>
+
+      <!-- Card 4 -->
+      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+        <div>
+          <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Приріст прибутку</p>
+          <h3 id="stat-profit" class="text-2xl font-bold text-emerald-400 mt-1">-- ₴</h3>
+          <p class="text-[11px] text-slate-500 mt-0.5">Потенціал недооцінених</p>
+        </div>
+        <div class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+          <i data-lucide="trending-up" class="w-6 h-6"></i>
+        </div>
+      </div>
+    </div>
+
+    <!-- Search & Filter Bar -->
+    <div class="flex items-center justify-between gap-4">
+      <div class="relative flex-1 max-w-md">
+        <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+        <input id="search-input" oninput="filterProducts()" type="text" placeholder="Пошук за назвою або SKU..." class="w-full bg-[#131d31] border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50">
+      </div>
+      <button onclick="loadData()" class="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800 border border-slate-700 transition" title="Оновити дані">
+        <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+      </button>
+    </div>
+
+    <!-- Interactive Monitoring Table -->
+    <div class="bg-[#131d31] rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+      <div class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-900/80 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-semibold">
+              <th class="py-3.5 px-4">Товар</th>
+              <th class="py-3.5 px-4">Собівартість & Поточна</th>
+              <th class="py-3.5 px-4 min-w-[240px]">Конкуренти (Prom.ua)</th>
+              <th class="py-3.5 px-4">Вердикт AI</th>
+              <th class="py-3.5 px-4">Рекомендована ціна</th>
+              <th class="py-3.5 px-4 text-center">Дія</th>
+            </tr>
+          </thead>
+          <tbody id="products-table-body" class="divide-y divide-slate-800/60 font-normal">
+            <!-- Dynamic rows will be injected here -->
+            <tr>
+              <td colspan="6" class="py-12 text-center text-slate-500">
+                <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2 text-cyan-400"></i>
+                Завантаження даних каталогу...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none flex items-center space-x-3 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl text-white text-xs">
+    <div id="toast-icon" class="text-cyan-400"></div>
+    <div id="toast-message">Повідомлення</div>
+  </div>
+
+  <!-- JavaScript Application Logic -->
+  <script>
+    let allProducts = [];
+
+    // Initialize Lucide Icons & PWA Service Worker
+    document.addEventListener("DOMContentLoaded", () => {
+      lucide.createIcons();
+      loadData();
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("/sw.js").catch(console.warn);
+      }
+    });
+
+    // Toast Notification helper
+    function showToast(message, isError = false) {
+      const toast = document.getElementById("toast");
+      const msg = document.getElementById("toast-message");
+      const icon = document.getElementById("toast-icon");
+
+      msg.textContent = message;
+      icon.innerHTML = isError
+        ? `<i data-lucide="alert-circle" class="w-5 h-5 text-rose-400"></i>`
+        : `<i data-lucide="check-circle" class="w-5 h-5 text-emerald-400"></i>`;
+      lucide.createIcons();
+
+      toast.classList.remove("translate-y-24", "opacity-0", "pointer-events-none");
+      setTimeout(() => {
+        toast.classList.add("translate-y-24", "opacity-0", "pointer-events-none");
+      }, 3500);
+    }
+
+    // Trigger Backend Actions
+    async function triggerAction(action, loadingMessage) {
+      showToast(loadingMessage);
+      try {
+        const resp = await fetch(`/api/actions/${action}`, { method: "POST" });
+        const data = await resp.json();
+        if (resp.ok) {
+          showToast(data.message || "Дію успішно виконано!");
+          await loadData();
+        } else {
+          showToast(data.detail || "Сталася помилка при виконанні дії", true);
+        }
+      } catch (err) {
+        showToast("Помилка зв'язку з сервером: " + err, true);
+      }
+    }
+
+    // Apply Single Product Recommendation
+    async function applyPrice(productId) {
+      try {
+        const resp = await fetch(`/api/actions/apply/${productId}`, { method: "POST" });
+        const data = await resp.json();
+        if (resp.ok) {
+          showToast(data.message || "Ціну успішно оновлено!");
+          await loadData();
+        } else {
+          showToast(data.detail || "Не вдалося оновити ціну", true);
+        }
+      } catch (err) {
+        showToast("Помилка: " + err, true);
+      }
+    }
+
+    // Fetch and Render Data
+    async function loadData() {
+      try {
+        const [statsRes, productsRes] = await Promise.all([
+          fetch("/api/stats"),
+          fetch("/api/products")
+        ]);
+
+        if (statsRes.ok) {
+          const stats = await statsRes.json();
+          document.getElementById("stat-products").textContent = stats.total_products;
+          document.getElementById("stat-offers").textContent = stats.total_offers;
+          document.getElementById("stat-matches").textContent = stats.approved_matches;
+          document.getElementById("stat-profit").textContent = `+${stats.potential_profit_boost.toLocaleString()} ₴`;
+        }
+
+        if (productsRes.ok) {
+          allProducts = await productsRes.json();
+          renderProducts(allProducts);
+        }
+      } catch (err) {
+        console.error("Failed to load dashboard data:", err);
+      }
+    }
+
+    function filterProducts() {
+      const q = document.getElementById("search-input").value.toLowerCase().trim();
+      if (!q) {
+        renderProducts(allProducts);
+        return;
+      }
+      const filtered = allProducts.filter(p =>
+        (p.title && p.title.toLowerCase().includes(q)) ||
+        (p.sku && p.sku.toLowerCase().includes(q))
+      );
+      renderProducts(filtered);
+    }
+
+    function renderProducts(products) {
+      const tbody = document.getElementById("products-table-body");
+      if (!products || products.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-10 text-center text-slate-500">Товарів не знайдено</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = products.map(p => {
+        const rec = p.recommendation;
+        const diff = rec ? rec.recommended_price - p.current_price : 0;
+        const diffAbs = Math.abs(diff).toFixed(1);
+
+        let diffBadge = "";
+        if (rec) {
+          if (diff > 0.01) {
+            diffBadge = `<span class="inline-flex items-center text-emerald-400 font-semibold text-[11px]"><i data-lucide="trending-up" class="w-3 h-3 mr-0.5"></i> +${diffAbs} ₴</span>`;
+          } else if (diff < -0.01) {
+            diffBadge = `<span class="inline-flex items-center text-rose-400 font-semibold text-[11px]"><i data-lucide="trending-down" class="w-3 h-3 mr-0.5"></i> -${diffAbs} ₴</span>`;
+          } else {
+            diffBadge = `<span class="text-slate-400 text-[11px]">= в ринку</span>`;
+          }
+        }
+
+        // Competitors snippets
+        let compHtml = `<span class="text-slate-500 text-[11px]">Немає знайдених оферів</span>`;
+        if (p.competitors && p.competitors.length > 0) {
+          compHtml = `<div class="space-y-1">` + p.competitors.slice(0, 3).map(c => `
+            <div class="flex items-center justify-between text-[11px] bg-slate-900/60 px-2 py-1 rounded-md border border-slate-800">
+              <span class="truncate max-w-[140px] text-slate-300" title="${c.title}">${c.seller_name}</span>
+              <a href="${c.url}" target="_blank" class="font-semibold text-cyan-400 hover:underline inline-flex items-center">
+                ${c.price.toFixed(1)} ₴ <i data-lucide="external-link" class="w-2.5 h-2.5 ml-1 text-slate-400"></i>
+              </a>
+            </div>
+          `).join('') + (p.competitors.length > 3 ? `<p class="text-[10px] text-slate-500 text-right">+ ще ${p.competitors.length - 3} оферів</p>` : '') + `</div>`;
+        }
+
+        // AI Verdict Badge
+        let verdictBadge = `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[11px]">Без аналізу</span>`;
+        if (p.match_summary) {
+          const m = p.match_summary;
+          const pct = Math.round(m.confidence_score * 100);
+          if (m.status === 'approved') {
+            verdictBadge = `<span class="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold text-[11px]" title="${m.ai_reasoning || ''}">✓ ${pct}% Схвалено</span>`;
+          } else if (m.status === 'rejected') {
+            verdictBadge = `<span class="px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-semibold text-[11px]" title="${m.ai_reasoning || ''}">✗ ${pct}% Відхилено</span>`;
+          } else {
+            verdictBadge = `<span class="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold text-[11px]" title="${m.ai_reasoning || ''}">? ${pct}% Очікує</span>`;
+          }
+        }
+
+        // Apply action button
+        const canApply = rec && rec.status === 'pending' && Math.abs(diff) > 0.01;
+        const applyBtn = canApply
+          ? `<button onclick="applyPrice(${p.id})" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs shadow-md shadow-indigo-600/20 transition active:scale-95">Застосувати</button>`
+          : `<span class="text-slate-500 text-[11px]">Застосовано</span>`;
+
+        return `
+          <tr class="hover:bg-slate-800/30 transition">
+            <!-- Product Info -->
+            <td class="py-3.5 px-4">
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                  ${p.image_url ? `<img src="${p.image_url}" alt="${p.title}" class="w-full h-full object-cover">` : `<i data-lucide="package" class="w-5 h-5 text-slate-500"></i>`}
+                </div>
+                <div class="min-w-0">
+                  <p class="font-medium text-white truncate max-w-[280px]" title="${p.title}">${p.title}</p>
+                  <p class="text-[11px] text-cyan-400 font-mono">SKU: ${p.sku || 'N/A'}</p>
+                </div>
+              </div>
+            </td>
+
+            <!-- Cost & Current Price -->
+            <td class="py-3.5 px-4">
+              <div class="text-[11px] space-y-0.5">
+                <p class="text-white font-semibold">Поточна: ${p.current_price.toFixed(1)} ₴</p>
+                <p class="text-slate-400">Закупка: ${p.cost_price.toFixed(1)} ₴</p>
+                <p class="text-slate-500">Floor: ${p.floor_price.toFixed(1)} ₴</p>
+              </div>
+            </td>
+
+            <!-- Competitor Offers -->
+            <td class="py-3.5 px-4">
+              ${compHtml}
+            </td>
+
+            <!-- AI Verdict -->
+            <td class="py-3.5 px-4">
+              ${verdictBadge}
+              ${p.match_summary && p.match_summary.ai_reasoning ? `<p class="text-[10px] text-slate-400 mt-1 max-w-[180px] line-clamp-2" title="${p.match_summary.ai_reasoning}">${p.match_summary.ai_reasoning}</p>` : ''}
+            </td>
+
+            <!-- Recommended Price -->
+            <td class="py-3.5 px-4">
+              ${rec ? `
+                <div class="space-y-0.5">
+                  <p class="text-sm font-bold text-white">${rec.recommended_price.toFixed(1)} ₴</p>
+                  <div>${diffBadge}</div>
+                </div>
+              ` : `<span class="text-slate-500 text-[11px]">--</span>`}
+            </td>
+
+            <!-- Action Button -->
+            <td class="py-3.5 px-4 text-center">
+              ${applyBtn}
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+{
+  "name": "AI Repricer Prom.ua",
+  "short_name": "Repricer",
+  "description": "Автоматизований моніторинг цін та AI-репрайсинг для Prom.ua",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0b1120",
+  "theme_color": "#1e293b",
+  "icons": [
+    {
+      "src": "https://img.icons8.com/fluency/192/bullish.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "https://img.icons8.com/fluency/512/bullish.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

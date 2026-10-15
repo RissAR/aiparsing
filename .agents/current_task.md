@@ -1,123 +1,184 @@
-# ТЗ №5: Двигун динамічного ціноутворення (Repricing Engine & Recommendations)
+# ТЗ №6: PWA Дашборд модерації (UI), Панель управління та Експорт оновленого фіду Prom.ua
 
 ## Мета
-Реалізувати сервіс динамічного ціноутворення (`PricingEngine`), який аналізує ринкові ціни лише за схваленими пропозиціями конкурентів у наявності (`status == 'approved'`, `is_in_stock == True`), розраховує безпечну рекомендовану ціну із захистом мінімальної маржі магазину (`Floor Price`), зберігає історію в таблицю `price_recommendations` та надає можливість застосування нових цін до каталогу `products`.
+Створити повноцінний автономний клієнтський додаток із веб-інтерфейсом (PWA SPA у стилі початкового макету), панеллю кнопок для запуску процесів парсингу, AI-аналізу та репрайсингу, інтерактивною таблицею модерації цін і автоматичним генератором оновленого XML-фіду для Prom.ua.
 
 ---
 
-## Стек технологій
-- **Мова:** Python 3.11+
-- **База даних:** SQLAlchemy 2.0+ (`Product`, `CompetitorOffer`, `ProductMatch`, `PriceRecommendation`)
-- **CLI:** `argparse`
+## Стек технологій та залежності
+- **Бекенд веб-сервер:** `fastapi>=0.110.0`, `uvicorn>=0.28.0` (додати до `requirements.txt`)
+- **База даних:** SQLAlchemy 2.0+ (використовуємо існуючі моделі)
+- **Фронтенд:** Сучасний Single-Page Application (HTML5 + Tailwind CSS CDN + Lucide Icons + PWA Manifest)
+- **Експорт даних:** `lxml.etree` для генерації валідного Prom.ua YML/XML фіду
 
 ---
 
 ## Структура файлів до створення / модифікації
 ```text
 /home/dofi/Dev/aiparsing/
+├── requirements.txt                   # Додати fastapi>=0.110.0, uvicorn>=0.28.0
+├── run_app.py                         # Головний запуск додатку: python run_app.py
 ├── src/
-│   └── services/
-│       └── pricing_engine.py          # Сервіс розрахунку рекомендованих цін та захисту маржі
-└── scripts/
-    └── calculate_prices.py            # CLI скрипт для запуску репрайсингу та застосування цін
+│   ├── services/
+│   │   └── feed_exporter.py           # Сервіс генерації актуального XML/YML фіду для Prom.ua
+│   ├── api/
+│   │   ├── __init__.py
+│   │   └── app.py                     # FastAPI сервер з REST ендпоінтами управління
+│   └── web/
+│       └── static/
+│           ├── index.html             # Головний UI дашборд (темна тема, таблиця, кнопки)
+│           ├── manifest.json          # PWA маніфест (назва, іконки, standalone режим)
+│           └── sw.js                  # Service Worker для роботи PWA
 ```
 
 ---
 
 ## Детальні вимоги до реалізації
 
-### 1. Сервіс ціноутворення `src/services/pricing_engine.py`
-Створити клас `PricingEngine`:
-
-- **Логіка розрахунку для одного товару (`calculate_for_product(db: Session, product: Product, delta: float = 5.0) -> PriceRecommendation`):**
-  1. **Вибірка валідних конкурентів:**
-     - Знайти всі `ProductMatch`, де `product_id == product.id` та `status == 'approved'`.
-     - Відфільтрувати пов'язані `CompetitorOffer`, де `is_in_stock == True` та `price > 0`.
-  2. **Розрахунок захисного порогу (Floor Price):**
-     - $$\text{floor\_price} = \text{product.cost\_price} \times \left(1.0 + \frac{\text{product.min\_margin\_percent}}{100.0}\right)$$
-     - Роздрібна ціна за жодних умов не може бути нижчою за це значення.
-  3. **Сценарії визначення ціни:**
-     - **Якщо валідних конкурентів немає в наявності:**
-       - $\text{min\_market\_price} = \text{product.current\_price}$
-       - $\text{recommended\_price} = \text{product.current\_price}$
-       - Примітка: *"Немає активних пропозицій конкурентів у наявності. Ціну збережено без змін."*
-     - **Якщо конкуренти є:**
-       - $\text{min\_market\_price} = \min(\text{competitor\_prices})$
-       - Цільова ціна для виходу в топ видачі:
-         $$\text{target\_price} = \text{min\_market\_price} - \text{delta}$$
-       - Фінальна рекомендована ціна з урахуванням захисту собівартості:
-         $$\text{recommended\_price} = \max(\text{target\_price}, \text{floor\_price})$$
-       - Округлення до 2 знаків після коми: `round(recommended_price, 2)`.
-  4. **Збереження результату:**
-     - Створює запис у таблиці `PriceRecommendation`:
-       - `product_id = product.id`
-       - `current_price = product.current_price`
-       - `min_market_price = min_market_price`
-       - `recommended_price = recommended_price`
-       - `status = "pending"`
-       - `calculated_at = datetime.now(timezone.utc)`
-     - Додає запис у сесію БД та зберігає.
-     - Повертає об'єкт `PriceRecommendation`.
-
-- **Метод `calculate_all(db: Session, delta: float = 5.0) -> list[PriceRecommendation]`:**
-  - Проходить по всіх активних товарах каталогу (`Product.is_active == True`).
-  - Розраховує та зберігає рекомендації для кожного товару.
-
-- **Метод `apply_recommendations(db: Session, recommendation_ids: Optional[list[int]] = None) -> int`:**
-  - Оновлює поточну ціну товару `product.current_price = rec.recommended_price`.
-  - Змінює статус рекомендації на `rec.status = "applied"`.
-  - Оновлює `product.updated_at = datetime.now(timezone.utc)`.
-  - Повертає кількість успішно застосованих цін.
+### 1. Оновлення `requirements.txt`
+Додати:
+- `fastapi>=0.110.0`
+- `uvicorn>=0.28.0`
 
 ---
 
-### 2. CLI скрипт `scripts/calculate_prices.py`
-Аргументи командного рядка:
-- `--delta`: крок зниження відносно мінімальної ціни конкурента (float, за замовчуванням `5.0`).
-- `--apply`: прапорець (boolean), якщо вказано — відразу застосувати рекомендовані ціни до каталогу товарів у БД.
-- Інформативний вивід у консоль:
+### 2. Сервіс експорту фіду `src/services/feed_exporter.py`
+Створити клас `FeedExporter`:
+- **Метод `generate_xml(db: Session) -> str`:**
+  - Отримує всі активні товари `Product.is_active == True`.
+  - Формує валідний XML за стандартом YML / Prom.ua:
+    ```xml
+    <?xml version="1.0" encoding="UTF-8"?>
+    <yml_catalog date="...">
+      <shop>
+        <name>Мій Магазин (AI Repriced)</name>
+        <currencies>
+          <currency id="UAH" rate="1"/>
+        </currencies>
+        <categories>
+          <category id="1">Електроніка та аксесуари</category>
+        </categories>
+        <offers>
+          <!-- Для кожного товару з актуальною current_price -->
+          <offer id="..." available="true">
+            <name>...</name>
+            <vendorCode>SKU</vendorCode>
+            <price>АКТУАЛЬНА_ЦІНА</price>
+            <currencyId>UAH</currencyId>
+            <categoryId>1</categoryId>
+            <picture>...</picture>
+          </offer>
+        </offers>
+      </shop>
+    </yml_catalog>
+    ```
+  - Повертає XML у вигляді рядка UTF-8.
+- **Метод `save_to_file(db: Session, filepath: str = "data/exports/prom_updated_feed.xml") -> str`:**
+  - Зберігає згенерований XML у файл та повертає шлях.
+
+---
+
+### 3. FastAPI бекенд `src/api/app.py`
+Створити додаток `app = FastAPI(title="AI Repricer for Prom.ua")`:
+- Підключити роздачу статичних файлів із папки `src/web/static` на кореневий маршрут `/`.
+- **REST API ендпоінти:**
+  1. `GET /api/stats`:
+     - Повертає зведену статистику: `total_products`, `total_offers`, `approved_matches`, `applied_recommendations`, `potential_profit_boost` (сума додаткового прибутку за недооціненими товарами).
+  2. `GET /api/products`:
+     - Повертає список товарів з БД.
+     - Для кожного товару включає:
+       - Поля товару (`id`, `sku`, `title`, `current_price`, `cost_price`, `image_url`).
+       - Список пов'язаних `competitors` (назва магазину, ціна, наявність, url).
+       - Статус матчингу (`confidence_score`, `match_method`, `status`, `ai_reasoning`).
+       - Рекомендацію ціни (`recommended_price`, `min_market_price`, `status`).
+  3. `POST /api/actions/run-all`:
+     - Запускає повний цикл (Discovery $\rightarrow$ AI Match $\rightarrow$ Repricing).
+     - Повертає статус виконання.
+  4. `POST /api/actions/discover`: запуск пошуку оферів на Prom.ua.
+  5. `POST /api/actions/match`: запуск AI-зіставлення через Gemini.
+  6. `POST /api/actions/reprice`: запуск розрахунку рекомендованих цін.
+  7. `POST /api/actions/apply/{product_id}`: застосування рекомендованої ціни для конкретного товару.
+  8. `POST /api/actions/apply-all`: застосування всіх схвалених рекомендацій до каталогу.
+  9. `GET /api/export/feed.xml`:
+     - Повертає оновлений XML-фід із заголовком `Content-Type: application/xml`. Клієнт може відкрити цей URL або вставити безпосередньо в кабінет Prom.ua.
+
+---
+
+### 4. PWA Клієнтський дашборд `src/web/static/`
+
+#### `index.html`:
+Створити естетичний, високоякісний адаптивний SPA-інтерфейс:
+- **Дизайн та стилі:**
+  - Темна сучасна палітра (як на початковому референсі: глибокий темно-синій/slate фон `#0b1120`, градієнтні акценти синього, фіолетового та бірюзового, заокруглені картки з тонкими рамками).
+  - Підключення Tailwind CSS через CDN та іконки Lucide (або Heroicons SVG).
+- **Шапка (Header):**
+  - Логотип і назва: `AI Repricer // Prom.ua Intelligence`.
+  - Бейджі статусу: `БД: Підключено` | `AI: Gemini 2.5 Flash Активний`.
+- **Панель швидких дій (Action Bar):**
+  - Кнопка з градієнтом: `[ 🚀 Запустити повний автопілот ]` (викликає `/api/actions/run-all` з індикатором завантаження/спінером).
+  - Допоміжні кнопки: `[ 🔍 Зібрати Prom ]`, `[ 🤖 AI-Матчинг ]`, `[ ⚡ Перерахувати ціни ]`, `[ ✓ Застосувати всі ціни ]`.
+  - Кнопка завантаження: `[ 📥 Завантажити XML для Prom.ua ]` (відкриває або скачує `/api/export/feed.xml`).
+- **Блок ключових метрик (4 плашки зі скріншота):**
+  1. *Каталог товарів* (кількість активних товарів).
+  2. *Конкурентні пропозиції* (знайдено цін на Prom).
+  3. *AI Аналіз* (кількість успішно схвалених зв'язок).
+  4. *Приріст маржі* (сума збереженого прибутку у ₴).
+- **Інтерактивна таблиця моніторингу цін:**
+  - Поля таблиці:
+    - **Товар:** Зображення, Назва, SKU (артикул).
+    - **Собівартість & Поточна ціна:** закупка, поріг маржі, поточна ціна в магазині.
+    - **Ціни конкурентів (Prom.ua):** картки зі знайденими магазинами («PixelCase», «Ціновал» тощо), їхніми цінами та клікабельними посиланнями на сторінку товару.
+    - **Вердикт AI:** бейдж із відсотком впевненості (зелений 98% exact, синій 95% gemini, червоний rejected) та підказка з детальним поясненням `ai_reasoning`.
+    - **Рекомендована ціна:** нове значення ціни з кольоровою позначкою (зелена стрілочка вгору `▲ +620 грн` або вниз).
+    - **Дія:** Кнопка `[ Застосувати ]` (відправляє POST-запит і миттєво оновлює рядок без перезавантаження сторінки).
+
+#### `manifest.json`:
+- `name`: "AI Repricer Prom.ua"
+- `short_name`: "Repricer"
+- `start_url`: "/"
+- `display`: "standalone"
+- `background_color`: "#0b1120"
+- `theme_color`: "#1e293b"
+
+#### `sw.js`:
+- Базовий Service Worker для кешування статичних ресурсів та забезпечення PWA-стандарту.
+
+---
+
+### 5. Головний запуск клієнтського додатку `run_app.py`
+Створити скрипт запуску в корені проєкту:
+- Використовує `uvicorn.run("src.api.app:app", host="127.0.0.1", port=8000, reload=True)`.
+- При запуску виводить красиве вітальне повідомлення:
   ```text
-  Запуск розрахунку цін (Repricing Engine)...
-  Крок дельти: 5.0 грн | Режим застосування: [Тільки розрахунок / Застосувати в базу]
-  --------------------------------------------------------------------------------------------------------
-  [SKU: PPDGL-01] Павербанк Baseus Blade 100W 20000mAh Black
-    Собівартість: 1850.0 грн | Поточна: 2699.0 грн | Поріг маржі (Floor): 2127.5 грн
-    Мінімальний конкурент: 3324.0 грн (схвалено оферів: 4)
-    -> Рекомендована ціна: 3319.0 грн [▲ +620.0 грн до прибутку магазину]
-  
-  [SKU: C80A-WHT] ...
-  --------------------------------------------------------------------------------------------------------
-  Підсумок аналізу цін:
-  - Товарів переоцінено вгору (Underpriced): 1
-  - Товарів переоцінено вниз (Overpriced): 0
-  - Без змін / Немає конкурентів: 11
-  - Захист собівартості: 0 порушень
-  Рекомендації успішно збережено в базі даних!
+  ============================================================
+  🚀 AI Repricer для Prom.ua успішно запущено!
+  👉 Відкрийте у браузері: http://127.0.0.1:8000
+  📱 Підтримується встановлення як PWA додаток на робочий стіл
+  ============================================================
   ```
 
 ---
 
 ## Критерії приймання та верифікація (Verification)
-1. Розрахунок цін без перезапису каталогу:
+1. Встановлення залежностей:
    ```bash
-   venv/bin/python scripts/calculate_prices.py --delta 5.0
+   venv/bin/pip install -r requirements.txt
    ```
-   *Очікуваний результат:* у таблиці `price_recommendations` з'являються записи зі статусом `pending`. Для товару `PPDGL-01` рекомендована ціна має бути в районі ~3319 грн (підняття під ринок із захистом маржі).
-2. Перевірка таблиці рекомендацій:
+2. Тестова перевірка генерації XML-фіду:
    ```bash
-   venv/bin/python -c "from src.database.connection import SessionLocal; from src.database.models import PriceRecommendation; db = SessionLocal(); recs = db.query(PriceRecommendation).all(); print(f'Total recommendations: {len(recs)}'); [print(f'Product {r.product_id}: was {r.current_price} -> rec {r.recommended_price} (min market: {r.min_market_price})') for r in recs]; assert len(recs) > 0; db.close()"
+   venv/bin/python -c "from src.database.connection import SessionLocal; from src.services.feed_exporter import FeedExporter; db = SessionLocal(); xml = FeedExporter.generate_xml(db); print(f'XML Length: {len(xml)}, Valid tags: {\"<yml_catalog>\" in xml and \"<offers>\" in xml}'); assert len(xml) > 0; db.close()"
    ```
-3. Застосування рекомендацій:
+3. Тестова перевірка запуску API:
+   Запустити фоновий сервер або перевірити імпорт та маршрути додатку:
    ```bash
-   venv/bin/python scripts/calculate_prices.py --delta 5.0 --apply
+   venv/bin/python -c "from src.api.app import app; print('FastAPI app routes:', [r.path for r in app.routes])"
    ```
-   *Очікуваний результат:* статус рекомендацій стає `applied`, а в таблиці `products` оновлюється `current_price`.
+   *Очікуваний результат:* наявні маршрути `/`, `/api/stats`, `/api/products`, `/api/actions/run-all`, `/api/export/feed.xml`.
 
 ---
 
 ## Формат звіту після виконання
 1. Список створених/модифікованих файлів.
-2. Лог виконання команди `calculate_prices.py` (розрахунок та застосування).
-3. Перевірка оновлених цін у базі даних.
-4. Єдина команда для git фіксації:
-   `git add . && git commit -m "feat: implement dynamic repricing engine with margin protection" && git push origin main`
+2. Результат верифікації генератора XML та маршрутів FastAPI.
+3. Єдина команда для git фіксації:
+   `git add . && git commit -m "feat: implement PWA web dashboard, control center API, and Prom.ua feed exporter" && git push origin main`

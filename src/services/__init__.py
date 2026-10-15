@@ -2,6 +2,7 @@
 
 from src.services.ai_matcher import GeminiMatcher
 from src.services.discovery_service import DiscoveryService, ProductDiscoveryResult
+from src.services.feed_exporter import FeedExporter
 from src.services.feed_importer import FeedImporter, ImportResult
 from src.services.matching_engine import MatchingEngine, MatchResult
 from src.services.pricing_engine import CalculationDetail, PricingEngine
@@ -10,6 +11,7 @@ from src.services.prom_scraper import PromScraper
 __all__ = [
     "FeedImporter",
     "ImportResult",
+    "FeedExporter",
     "PromScraper",
     "DiscoveryService",
     "ProductDiscoveryResult",
