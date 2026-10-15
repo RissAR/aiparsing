@@ -1,137 +1,123 @@
-# ТЗ №4: Інтелектуальний модуль зіставлення товарів (AI & Fuzzy Matching Engine)
+# ТЗ №5: Двигун динамічного ціноутворення (Repricing Engine & Recommendations)
 
 ## Мета
-Реалізувати дворівневий модуль зіставлення (Level 1: швидкий fuzzy/rule-based фільтр + Level 2: AI-арбітр на базі Google Gemini 2.5 Flash), який порівнює наші товари з зібраними пропозиціями конкурентів, оцінює відсоток впевненості (`confidence_score` 0.0 - 1.0) та заповнює таблицю `product_matches`.
+Реалізувати сервіс динамічного ціноутворення (`PricingEngine`), який аналізує ринкові ціни лише за схваленими пропозиціями конкурентів у наявності (`status == 'approved'`, `is_in_stock == True`), розраховує безпечну рекомендовану ціну із захистом мінімальної маржі магазину (`Floor Price`), зберігає історію в таблицю `price_recommendations` та надає можливість застосування нових цін до каталогу `products`.
 
 ---
 
-## Стек технологій та залежності
-- **Fuzzy Matching:** `rapidfuzz>=3.0.0`
-- **AI SDK:** `google-genai>=0.1.0`
-- **Модель AI:** `gemini-2.5-flash` (ключ береться з `.env`)
-- **База даних:** SQLAlchemy (`Product`, `CompetitorOffer`, `ProductMatch`)
+## Стек технологій
+- **Мова:** Python 3.11+
+- **База даних:** SQLAlchemy 2.0+ (`Product`, `CompetitorOffer`, `ProductMatch`, `PriceRecommendation`)
+- **CLI:** `argparse`
 
 ---
 
 ## Структура файлів до створення / модифікації
 ```text
 /home/dofi/Dev/aiparsing/
-├── requirements.txt                   # Додати rapidfuzz>=3.0.0 та google-genai>=0.1.0
 ├── src/
-│   ├── config.py                      # Додати параметри GEMINI_API_KEY, GEMINI_MODEL
 │   └── services/
-│       ├── discovery_service.py       # Додати створення ProductMatch зв'язки при збереженні оферів
-│       ├── ai_matcher.py              # Клієнт Google Gemini для порівняння товарів у JSON форматі
-│       └── matching_engine.py         # Дворівневий оркестратор зіставлення (Rules + Fuzzy + AI)
+│       └── pricing_engine.py          # Сервіс розрахунку рекомендованих цін та захисту маржі
 └── scripts/
-    └── match_products.py              # CLI скрипт для запуску процесу матчингу
+    └── calculate_prices.py            # CLI скрипт для запуску репрайсингу та застосування цін
 ```
 
 ---
 
 ## Детальні вимоги до реалізації
 
-### 1. Оновлення `requirements.txt`
-Додати:
-- `rapidfuzz>=3.0.0`
-- `google-genai>=0.1.0`
+### 1. Сервіс ціноутворення `src/services/pricing_engine.py`
+Створити клас `PricingEngine`:
 
-### 2. Оновлення `src/config.py`
-Додати зчитування параметрів для Gemini:
-- `gemini_api_key: Optional[str] = None` (зчитується з `GEMINI_API_KEY` або `.env`)
-- `gemini_model: str = "gemini-2.5-flash"` (зчитується з `GEMINI_MODEL` або дефолт)
+- **Логіка розрахунку для одного товару (`calculate_for_product(db: Session, product: Product, delta: float = 5.0) -> PriceRecommendation`):**
+  1. **Вибірка валідних конкурентів:**
+     - Знайти всі `ProductMatch`, де `product_id == product.id` та `status == 'approved'`.
+     - Відфільтрувати пов'язані `CompetitorOffer`, де `is_in_stock == True` та `price > 0`.
+  2. **Розрахунок захисного порогу (Floor Price):**
+     - $$\text{floor\_price} = \text{product.cost\_price} \times \left(1.0 + \frac{\text{product.min\_margin\_percent}}{100.0}\right)$$
+     - Роздрібна ціна за жодних умов не може бути нижчою за це значення.
+  3. **Сценарії визначення ціни:**
+     - **Якщо валідних конкурентів немає в наявності:**
+       - $\text{min\_market\_price} = \text{product.current\_price}$
+       - $\text{recommended\_price} = \text{product.current\_price}$
+       - Примітка: *"Немає активних пропозицій конкурентів у наявності. Ціну збережено без змін."*
+     - **Якщо конкуренти є:**
+       - $\text{min\_market\_price} = \min(\text{competitor\_prices})$
+       - Цільова ціна для виходу в топ видачі:
+         $$\text{target\_price} = \text{min\_market\_price} - \text{delta}$$
+       - Фінальна рекомендована ціна з урахуванням захисту собівартості:
+         $$\text{recommended\_price} = \max(\text{target\_price}, \text{floor\_price})$$
+       - Округлення до 2 знаків після коми: `round(recommended_price, 2)`.
+  4. **Збереження результату:**
+     - Створює запис у таблиці `PriceRecommendation`:
+       - `product_id = product.id`
+       - `current_price = product.current_price`
+       - `min_market_price = min_market_price`
+       - `recommended_price = recommended_price`
+       - `status = "pending"`
+       - `calculated_at = datetime.now(timezone.utc)`
+     - Додає запис у сесію БД та зберігає.
+     - Повертає об'єкт `PriceRecommendation`.
 
-### 3. Оновлення `src/services/discovery_service.py`
-- При знаходженні пропозиції для `product`:
-  - Крім збереження/оновлення `CompetitorOffer`, перевіряти наявність запису `ProductMatch(product_id=product.id, competitor_offer_id=offer.id)`.
-  - Якщо зв'язки немає — створювати запис `ProductMatch` зі статусом `pending`, `confidence_score=0.0`, `match_method="discovered"`.
-  - Якщо вже існує — залишати без змін.
-- Забезпечити збереження в БД.
+- **Метод `calculate_all(db: Session, delta: float = 5.0) -> list[PriceRecommendation]`:**
+  - Проходить по всіх активних товарах каталогу (`Product.is_active == True`).
+  - Розраховує та зберігає рекомендації для кожного товару.
 
-### 4. Модуль AI-зіставлення `src/services/ai_matcher.py`
-Створити клас `GeminiMatcher`:
-- Ініціалізується з `api_key` та `model_name`.
-- **Метод `compare(our_title: str, our_sku: str, our_price: float, comp_title: str, comp_price: float) -> dict`:**
-  - Якщо `api_key` відсутній — повертає `{"is_same_product": False, "confidence": 0.5, "reasoning": "Gemini API key not configured"}`.
-  - Формує запит до моделі порівняти товар нашого магазину і товар конкурента.
-  - Використовує структурований JSON-вихід (`response_mime_type="application/json"`).
-  - Очікувана схема відповіді:
-    ```json
-    {
-      "is_same_product": true,
-      "confidence": 0.95,
-      "reasoning": "Пояснення українською мовою щодо відповідності моделі, ємності, кольору тощо."
-    }
-    ```
-  - Обробляє можливі помилки запиту та таймаути (fallback на safe default).
+- **Метод `apply_recommendations(db: Session, recommendation_ids: Optional[list[int]] = None) -> int`:**
+  - Оновлює поточну ціну товару `product.current_price = rec.recommended_price`.
+  - Змінює статус рекомендації на `rec.status = "applied"`.
+  - Оновлює `product.updated_at = datetime.now(timezone.utc)`.
+  - Повертає кількість успішно застосованих цін.
 
-### 5. Сервіс матчингу `src/services/matching_engine.py`
-Створити клас `MatchingEngine`:
-- **Логіка оцінки відповідності (`evaluate_match(product: Product, offer: CompetitorOffer, force_ai: bool = False) -> MatchResult`):**
-  1. **Крок A (Exact SKU / Артикул):**
-     - Якщо `product.sku` (довжиною >= 3 символи) присутній у `offer.title` (case-insensitive):
-       $\rightarrow$ `confidence = 0.98`, `method = "exact_sku"`, `reasoning = f"Точний збіг артикулу {product.sku}"`.
-  2. **Крок B (Rule-based невідповідності):**
-     - Перевірка несумісності ключових чисел: якщо у нашого товару є потужність (наприклад `100W`), а у конкурента явно інша (наприклад `65W`) $\rightarrow$ `confidence = 0.15`, `method = "rule_based"`, `reasoning = "Невідповідність ключових характеристик (потужність/модель)"`.
-     - Якщо різні бренди (наприклад наш Baseus, а у конкурента Xiaomi або Hoco) $\rightarrow$ `confidence = 0.10`, `method = "rule_based"`, `reasoning = "Різні бренди"`.
-  3. **Крок C (Текстовий Fuzzy-аналіз через `rapidfuzz`):**
-     - Розрахунок `similarity = rapidfuzz.fuzz.token_set_ratio(product.title, offer.title) / 100.0`.
-     - Якщо `similarity >= 0.90` $\rightarrow$ `confidence = similarity`, `method = "fuzzy_title"`.
-  4. **Крок D (AI Арбітр через `GeminiMatcher`):**
-     - Якщо оцінка знаходиться в «сірій зоні» (`0.45 <= similarity < 0.90`) або якщо передано `force_ai=True`:
-       - Викликається `GeminiMatcher.compare(...)`.
-       - Береться `confidence` та `reasoning` від моделі, `method = "ai_gemini"`.
-  5. **Крок E (Фінальний статус):**
-     - `status = "approved"` якщо `confidence >= 0.80` та `offer.is_in_stock == True`.
-     - `status = "rejected"` якщо `confidence < 0.50` або `is_same_product == False`.
-     - `status = "pending"` у проміжних випадках.
-- **Метод `process_pending_matches(db: Session, force_ai: bool = False) -> list[ProductMatch]`:**
-  - Знаходить усі `ProductMatch` зі статусом `pending` (або створює їх для існуючих зв'язок, якщо ще не створені).
-  - Запускає `evaluate_match`, оновлює поля `confidence_score`, `match_method`, `status`, `ai_reasoning`.
-  - Зберігає зміни в БД.
+---
 
-### 6. CLI скрипт `scripts/match_products.py`
-- Аргументи:
-  - `--force-ai`: примусово опитувати Gemini для всіх кандидатів (за замовчуванням тільки для спірних або без точного SKU).
-  - `--link-existing`: перед матчингом автоматично створити записи `ProductMatch` для вже зібраних `CompetitorOffer`, якщо вони ще не прив'язані.
-- Вивід у консоль гарної підсумкової таблиці:
+### 2. CLI скрипт `scripts/calculate_prices.py`
+Аргументи командного рядка:
+- `--delta`: крок зниження відносно мінімальної ціни конкурента (float, за замовчуванням `5.0`).
+- `--apply`: прапорець (boolean), якщо вказано — відразу застосувати рекомендовані ціни до каталогу товарів у БД.
+- Інформативний вивід у консоль:
   ```text
-  Запуск оцінки відповідності товарів (Matching Engine)...
+  Запуск розрахунку цін (Repricing Engine)...
+  Крок дельти: 5.0 грн | Режим застосування: [Тільки розрахунок / Застосувати в базу]
   --------------------------------------------------------------------------------------------------------
-  Наш товар: Павербанк Baseus Blade 100W 20000mAh Black (PPDGL-01)
-    [98%] APPROVED (exact_sku): УМБ Baseus PPDGL-01 20000mAh, 100W (4043.0 грн)
-          -> Точний збіг артикулу PPDGL-01
-    [15%] REJECTED (rule_based): Повербанк Baseus Blade H1 65W 20000mAh (3299.0 грн)
-          -> Невідповідність характеристик (65W vs 100W)
-    [95%] APPROVED (ai_gemini): Павербанк Baseus Blade Digital Display 20000 mAh PD 100W Black (3324.0 грн)
-          -> Обидва товари ідентичні: модель Baseus Blade 100W 20000mAh
+  [SKU: PPDGL-01] Павербанк Baseus Blade 100W 20000mAh Black
+    Собівартість: 1850.0 грн | Поточна: 2699.0 грн | Поріг маржі (Floor): 2127.5 грн
+    Мінімальний конкурент: 3324.0 грн (схвалено оферів: 4)
+    -> Рекомендована ціна: 3319.0 грн [▲ +620.0 грн до прибутку магазину]
+  
+  [SKU: C80A-WHT] ...
   --------------------------------------------------------------------------------------------------------
-  Всього оброблено зв'язок: 11
-  Схвалено (Approved): 4 | Відхилено (Rejected): 6 | На ручній перевірці (Pending): 1
+  Підсумок аналізу цін:
+  - Товарів переоцінено вгору (Underpriced): 1
+  - Товарів переоцінено вниз (Overpriced): 0
+  - Без змін / Немає конкурентів: 11
+  - Захист собівартості: 0 порушень
+  Рекомендації успішно збережено в базі даних!
   ```
 
 ---
 
 ## Критерії приймання та верифікація (Verification)
-1. Встановлено залежності:
+1. Розрахунок цін без перезапису каталогу:
    ```bash
-   venv/bin/pip install -r requirements.txt
+   venv/bin/python scripts/calculate_prices.py --delta 5.0
    ```
-2. Запуск матчингу:
+   *Очікуваний результат:* у таблиці `price_recommendations` з'являються записи зі статусом `pending`. Для товару `PPDGL-01` рекомендована ціна має бути в районі ~3319 грн (підняття під ринок із захистом маржі).
+2. Перевірка таблиці рекомендацій:
    ```bash
-   venv/bin/python scripts/match_products.py --link-existing
+   venv/bin/python -c "from src.database.connection import SessionLocal; from src.database.models import PriceRecommendation; db = SessionLocal(); recs = db.query(PriceRecommendation).all(); print(f'Total recommendations: {len(recs)}'); [print(f'Product {r.product_id}: was {r.current_price} -> rec {r.recommended_price} (min market: {r.min_market_price})') for r in recs]; assert len(recs) > 0; db.close()"
    ```
-3. Перевірка бази даних:
+3. Застосування рекомендацій:
    ```bash
-   venv/bin/python -c "from src.database.connection import SessionLocal; from src.database.models import ProductMatch; db = SessionLocal(); matches = db.query(ProductMatch).all(); print(f'Total matches in DB: {len(matches)}'); [print(f'[{m.status.upper()}] {m.confidence_score*100:.0f}% ({m.match_method}): {m.ai_reasoning[:60]}...') for m in matches[:5]]; assert len(matches) > 0; db.close()"
+   venv/bin/python scripts/calculate_prices.py --delta 5.0 --apply
    ```
-   *Очікуваний результат:* у таблиці `product_matches` з'явилися записи зі статусами `approved` та `rejected`, заповненими `confidence_score` та детальним обґрунтуванням `ai_reasoning`.
+   *Очікуваний результат:* статус рекомендацій стає `applied`, а в таблиці `products` оновлюється `current_price`.
 
 ---
 
 ## Формат звіту після виконання
 1. Список створених/модифікованих файлів.
-2. Лог виконання команди `scripts/match_products.py --link-existing`.
-3. Результат перевірки бази даних.
+2. Лог виконання команди `calculate_prices.py` (розрахунок та застосування).
+3. Перевірка оновлених цін у базі даних.
 4. Єдина команда для git фіксації:
-   `git add . && git commit -m "feat: implement hybrid AI and fuzzy matching engine with Gemini" && git push origin main`
+   `git add . && git commit -m "feat: implement dynamic repricing engine with margin protection" && git push origin main`
