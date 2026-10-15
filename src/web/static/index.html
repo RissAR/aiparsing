@@ -45,6 +45,13 @@
     .custom-scrollbar::-webkit-scrollbar-track {
       background: #0f172a;
     }
+    @keyframes pulse-subtle {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.6; }
+    }
+    .animate-pulse-subtle {
+      animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
   </style>
 </head>
 <body class="min-h-screen flex flex-col bg-[#0b1120]">
@@ -81,31 +88,47 @@
   <!-- Main Content -->
   <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
 
+    <!-- Persistent Error Alert Banner -->
+    <div id="error-banner" class="hidden bg-rose-950/80 border border-rose-500/50 rounded-2xl p-4 flex items-start justify-between gap-3 text-rose-200 shadow-xl shadow-rose-950/40">
+      <div class="flex items-start space-x-3">
+        <div class="p-1.5 rounded-lg bg-rose-500/20 text-rose-400 mt-0.5 flex-shrink-0">
+          <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h4 class="text-sm font-semibold text-rose-100">Помилка виконання операції</h4>
+          <p id="error-message" class="text-xs text-rose-300/90 mt-0.5 leading-relaxed font-mono"></p>
+        </div>
+      </div>
+      <button onclick="dismissError()" class="p-1.5 rounded-lg text-rose-400 hover:text-white hover:bg-rose-500/20 transition flex-shrink-0" title="Закрити помилку">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    </div>
+
     <!-- Action Bar -->
     <div class="bg-[#131d31] p-4 rounded-2xl border border-slate-800 flex flex-wrap items-center justify-between gap-3 shadow-xl shadow-black/20">
       <div class="flex flex-wrap items-center gap-2.5">
         <!-- Main Autopilot Button -->
-        <button id="btn-run-all" onclick="triggerAction('run-all', 'Повний автопілот запущено...')" class="inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]">
-          <i data-lucide="rocket" class="w-4 h-4"></i>
-          <span>Запустити повний автопілот</span>
+        <button id="btn-run-all" onclick="triggerRunAll()" class="action-btn inline-flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold text-sm shadow-lg shadow-indigo-600/30 transition-all hover:scale-[1.02] active:scale-[0.98]">
+          <i data-lucide="rocket" class="w-4 h-4 btn-icon"></i>
+          <span class="btn-text">Запустити повний автопілот</span>
         </button>
 
         <!-- Sub Actions -->
-        <button id="btn-discover" onclick="triggerAction('discover', 'Збір оферів з Prom.ua...')" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
-          <i data-lucide="search" class="w-3.5 h-3.5 text-cyan-400"></i>
-          <span>Зібрати Prom</span>
+        <button id="btn-discover" onclick="triggerSingleAction('discover', 'Збір оферів з Prom.ua...')" class="action-btn inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+          <i data-lucide="search" class="w-3.5 h-3.5 text-cyan-400 btn-icon"></i>
+          <span class="btn-text">Зібрати Prom</span>
         </button>
-        <button id="btn-match" onclick="triggerAction('match', 'AI-зіставлення через Gemini...')" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
-          <i data-lucide="bot" class="w-3.5 h-3.5 text-purple-400"></i>
-          <span>AI-Матчинг</span>
+        <button id="btn-match" onclick="triggerSingleAction('match', 'AI-зіставлення через Gemini...')" class="action-btn inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+          <i data-lucide="bot" class="w-3.5 h-3.5 text-purple-400 btn-icon"></i>
+          <span class="btn-text">AI-Матчинг</span>
         </button>
-        <button id="btn-reprice" onclick="triggerAction('reprice', 'Перерахунок рекомендованих цін...')" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
-          <i data-lucide="calculator" class="w-3.5 h-3.5 text-amber-400"></i>
-          <span>Перерахувати ціни</span>
+        <button id="btn-reprice" onclick="triggerSingleAction('reprice', 'Перерахунок рекомендованих цін...')" class="action-btn inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition">
+          <i data-lucide="calculator" class="w-3.5 h-3.5 text-amber-400 btn-icon"></i>
+          <span class="btn-text">Перерахувати ціни</span>
         </button>
-        <button id="btn-apply-all" onclick="triggerAction('apply-all', 'Застосування всіх схвалених цін...')" class="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition">
-          <i data-lucide="check-check" class="w-3.5 h-3.5"></i>
-          <span>Застосувати всі ціни</span>
+        <button id="btn-apply-all" onclick="triggerSingleAction('apply-all', 'Застосування всіх схвалених цін...')" class="action-btn inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-xl bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 text-xs font-semibold border border-emerald-500/30 transition">
+          <i data-lucide="check-check" class="w-3.5 h-3.5 btn-icon"></i>
+          <span class="btn-text">Застосувати всі ціни</span>
         </button>
       </div>
 
@@ -118,10 +141,31 @@
       </div>
     </div>
 
+    <!-- Live Progress & Activity Banner -->
+    <div id="progress-banner" class="hidden bg-[#131d31] p-4 rounded-2xl border border-indigo-500/30 shadow-xl shadow-indigo-950/20 space-y-3">
+      <div class="flex items-center justify-between text-xs">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-6 h-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400">
+            <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i>
+          </div>
+          <div>
+            <span id="progress-step-text" class="font-semibold text-white tracking-wide">Крок 1/3: Збір актуальних цін з Prom.ua...</span>
+            <p id="progress-subtext" class="text-[11px] text-slate-400 mt-0.5">Операція виконується у фоновому режимі</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <span id="progress-percent" class="font-mono text-cyan-400 font-bold text-sm">33%</span>
+        </div>
+      </div>
+      <div class="w-full bg-slate-800/80 rounded-full h-2 overflow-hidden p-0.5 border border-slate-700/50">
+        <div id="progress-bar-fill" class="bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 h-full rounded-full transition-all duration-500 ease-out" style="width: 33%"></div>
+      </div>
+    </div>
+
     <!-- Metrics Cards (4 stats) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- Card 1 -->
-      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
         <div>
           <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Каталог товарів</p>
           <h3 id="stat-products" class="text-2xl font-bold text-white mt-1">--</h3>
@@ -133,7 +177,7 @@
       </div>
 
       <!-- Card 2 -->
-      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
         <div>
           <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Офери конкурентів</p>
           <h3 id="stat-offers" class="text-2xl font-bold text-white mt-1">--</h3>
@@ -145,7 +189,7 @@
       </div>
 
       <!-- Card 3 -->
-      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
         <div>
           <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">AI Схвалено</p>
           <h3 id="stat-matches" class="text-2xl font-bold text-white mt-1">--</h3>
@@ -157,7 +201,7 @@
       </div>
 
       <!-- Card 4 -->
-      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between">
+      <div class="bg-[#131d31] p-5 rounded-2xl border border-slate-800 flex items-center justify-between shadow-lg">
         <div>
           <p class="text-xs font-medium text-slate-400 uppercase tracking-wider">Приріст прибутку</p>
           <h3 id="stat-profit" class="text-2xl font-bold text-emerald-400 mt-1">-- ₴</h3>
@@ -169,26 +213,43 @@
       </div>
     </div>
 
-    <!-- Search & Filter Bar -->
-    <div class="flex items-center justify-between gap-4">
-      <div class="relative flex-1 max-w-md">
-        <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
-        <input id="search-input" oninput="filterProducts()" type="text" placeholder="Пошук за назвою або SKU..." class="w-full bg-[#131d31] border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50">
+    <!-- Tabs & Search Bar -->
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800 pb-3">
+      <!-- Tab Switchers -->
+      <div class="flex items-center space-x-2">
+        <button id="tab-catalog" onclick="switchTab('catalog')" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold border transition bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-sm">
+          <i data-lucide="layout-grid" class="w-4 h-4"></i>
+          <span>Мій каталог і репрайсинг</span>
+          <span id="tab-catalog-count" class="ml-1.5 px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/20 text-cyan-300 font-bold">13</span>
+        </button>
+        <button id="tab-competitors" onclick="switchTab('competitors')" class="flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold border transition border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60">
+          <i data-lucide="users" class="w-4 h-4"></i>
+          <span>Всі зібрані конкуренти з Prom.ua</span>
+          <span id="tab-competitors-count" class="ml-1.5 px-2 py-0.5 rounded-full text-[10px] bg-slate-800 text-slate-300 font-bold">61</span>
+        </button>
       </div>
-      <button onclick="loadData()" class="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800 border border-slate-700 transition" title="Оновити дані">
-        <i data-lucide="rotate-cw" class="w-4 h-4"></i>
-      </button>
+
+      <!-- Search & Refresh -->
+      <div class="flex items-center gap-3">
+        <div class="relative flex-1 md:w-80">
+          <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
+          <input id="search-input" oninput="handleSearch()" type="text" placeholder="Пошук за назвою або артикулом..." class="w-full bg-[#131d31] border border-slate-800 rounded-xl pl-10 pr-4 py-2 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50">
+        </div>
+        <button onclick="loadData()" class="p-2 text-slate-400 hover:text-white rounded-xl bg-slate-800 border border-slate-700 transition" title="Оновити дані">
+          <i data-lucide="rotate-cw" class="w-4 h-4"></i>
+        </button>
+      </div>
     </div>
 
-    <!-- Interactive Monitoring Table -->
-    <div class="bg-[#131d31] rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+    <!-- View 1: My Catalog & Repricing Table -->
+    <div id="view-catalog" class="bg-[#131d31] rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
       <div class="overflow-x-auto custom-scrollbar">
         <table class="w-full text-left border-collapse text-xs">
           <thead>
             <tr class="bg-slate-900/80 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-semibold">
               <th class="py-3.5 px-4">Товар</th>
               <th class="py-3.5 px-4">Собівартість & Поточна</th>
-              <th class="py-3.5 px-4 min-w-[240px]">Конкуренти (Prom.ua)</th>
+              <th class="py-3.5 px-4 min-w-[260px]">Конкуренти (Prom.ua)</th>
               <th class="py-3.5 px-4">Вердикт AI</th>
               <th class="py-3.5 px-4">Рекомендована ціна</th>
               <th class="py-3.5 px-4 text-center">Дія</th>
@@ -206,7 +267,78 @@
         </table>
       </div>
     </div>
+
+    <!-- View 2: All Competitors Offers Table -->
+    <div id="view-competitors" class="hidden bg-[#131d31] rounded-2xl border border-slate-800 overflow-hidden shadow-2xl">
+      <div class="overflow-x-auto custom-scrollbar">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead>
+            <tr class="bg-slate-900/80 text-slate-400 border-b border-slate-800 uppercase tracking-wider font-semibold">
+              <th class="py-3.5 px-4">Фото</th>
+              <th class="py-3.5 px-4 min-w-[260px]">Назва на Prom.ua</th>
+              <th class="py-3.5 px-4">Магазин / Продавець</th>
+              <th class="py-3.5 px-4">Ціна</th>
+              <th class="py-3.5 px-4">Наявність</th>
+              <th class="py-3.5 px-4 min-w-[220px]">Наш товар & AI статус</th>
+              <th class="py-3.5 px-4 text-center">Посилання</th>
+            </tr>
+          </thead>
+          <tbody id="competitors-table-body" class="divide-y divide-slate-800/60 font-normal">
+            <!-- Dynamic competitor rows will be injected here -->
+            <tr>
+              <td colspan="7" class="py-12 text-center text-slate-500">
+                <i data-lucide="loader-2" class="w-6 h-6 animate-spin mx-auto mb-2 text-cyan-400"></i>
+                Завантаження пропозицій конкурентів...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
   </main>
+
+  <!-- Competitors Details Modal Dialog -->
+  <div id="competitors-modal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden items-center justify-center p-4">
+    <div class="bg-[#131d31] border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden">
+      <!-- Modal Header -->
+      <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/40">
+        <div class="min-w-0 pr-4">
+          <div class="flex items-center space-x-2">
+            <span class="px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-mono text-[10px]" id="modal-product-sku">SKU</span>
+            <span class="text-xs text-slate-400" id="modal-product-category">Категорія</span>
+          </div>
+          <h3 class="text-base font-bold text-white mt-1 truncate" id="modal-product-title">Назва нашого товару</h3>
+        </div>
+        <button onclick="closeCompetitorsModal()" class="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Product Summary Bar -->
+      <div class="px-5 py-3 bg-slate-900/80 border-b border-slate-800 flex flex-wrap items-center justify-between text-xs gap-3">
+        <div class="flex items-center space-x-4">
+          <div><span class="text-slate-400">Поточна ціна: </span><span id="modal-current-price" class="font-bold text-white">--</span></div>
+          <div><span class="text-slate-400">Собівартість: </span><span id="modal-cost-price" class="text-slate-300">--</span></div>
+          <div><span class="text-slate-400">Floor ціна: </span><span id="modal-floor-price" class="text-slate-300">--</span></div>
+        </div>
+        <div>
+          <span class="text-slate-400">Всього оферів: </span><span id="modal-offers-count" class="font-bold text-cyan-400">0</span>
+        </div>
+      </div>
+
+      <!-- Modal Content: List of Competitors -->
+      <div id="modal-competitors-list" class="p-5 overflow-y-auto custom-scrollbar space-y-3 flex-1">
+        <!-- Injected competitor cards -->
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="p-4 border-t border-slate-800 bg-slate-900/40 flex justify-end">
+        <button onclick="closeCompetitorsModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold border border-slate-700 transition">
+          Закрити
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- Notification Toast -->
   <div id="toast" class="fixed bottom-6 right-6 z-50 transform translate-y-24 opacity-0 transition-all duration-300 pointer-events-none flex items-center space-x-3 px-4 py-3 rounded-xl bg-slate-900 border border-slate-700 shadow-2xl text-white text-xs">
@@ -217,6 +349,8 @@
   <!-- JavaScript Application Logic -->
   <script>
     let allProducts = [];
+    let allCompetitorOffers = [];
+    let currentTab = 'catalog'; // 'catalog' | 'competitors'
 
     // Initialize Lucide Icons & PWA Service Worker
     document.addEventListener("DOMContentLoaded", () => {
@@ -225,9 +359,34 @@
       if ("serviceWorker" in navigator) {
         navigator.serviceWorker.register("/sw.js").catch(console.warn);
       }
+
+      // Close modal on escape key
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeCompetitorsModal();
+      });
+
+      // Close modal on click outside backdrop
+      const modal = document.getElementById("competitors-modal");
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeCompetitorsModal();
+      });
     });
 
-    // Toast Notification helper
+    // Persistent Error Alert Helpers
+    function showError(message) {
+      const banner = document.getElementById("error-banner");
+      const msg = document.getElementById("error-message");
+      msg.textContent = message;
+      banner.classList.remove("hidden");
+      lucide.createIcons();
+    }
+
+    function dismissError() {
+      const banner = document.getElementById("error-banner");
+      banner.classList.add("hidden");
+    }
+
+    // Toast Notification helper (for transient non-critical confirmations)
     function showToast(message, isError = false) {
       const toast = document.getElementById("toast");
       const msg = document.getElementById("toast-message");
@@ -245,20 +404,119 @@
       }, 3500);
     }
 
-    // Trigger Backend Actions
-    async function triggerAction(action, loadingMessage) {
-      showToast(loadingMessage);
+    // Button states helper
+    const originalButtonContents = {};
+
+    function setButtonsLoading(isLoading, activeBtnId = null) {
+      const buttons = document.querySelectorAll(".action-btn");
+      buttons.forEach(btn => {
+        if (isLoading) {
+          btn.disabled = true;
+          btn.classList.add("opacity-50", "cursor-not-allowed", "pointer-events-none");
+          if (btn.id === activeBtnId) {
+            originalButtonContents[btn.id] = btn.innerHTML;
+            const iconElem = btn.querySelector(".btn-icon");
+            if (iconElem) {
+              iconElem.outerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin btn-icon"></i>`;
+            }
+          }
+        } else {
+          btn.disabled = false;
+          btn.classList.remove("opacity-50", "cursor-not-allowed", "pointer-events-none");
+          if (originalButtonContents[btn.id]) {
+            btn.innerHTML = originalButtonContents[btn.id];
+          }
+        }
+      });
+      lucide.createIcons();
+    }
+
+    // Progress Banner Helpers
+    function showProgress(stepText, percent = 33, subtext = "Операція виконується у фоновому режимі...") {
+      const banner = document.getElementById("progress-banner");
+      const textElem = document.getElementById("progress-step-text");
+      const subElem = document.getElementById("progress-subtext");
+      const pctElem = document.getElementById("progress-percent");
+      const fillElem = document.getElementById("progress-bar-fill");
+
+      textElem.textContent = stepText;
+      subElem.textContent = subtext;
+      pctElem.textContent = `${percent}%`;
+      fillElem.style.width = `${percent}%`;
+
+      banner.classList.remove("hidden");
+      lucide.createIcons();
+    }
+
+    function hideProgress() {
+      const banner = document.getElementById("progress-banner");
+      banner.classList.add("hidden");
+    }
+
+    // Multi-Step Autopilot Action
+    async function triggerRunAll() {
+      dismissError();
+      setButtonsLoading(true, "btn-run-all");
+
+      try {
+        // Step 1: Discovery
+        showProgress("Крок 1/3: Збір актуальних цін з Prom.ua...", 33, "Опитування пошуку Prom.ua для активних товарів");
+        const res1 = await fetch("/api/actions/discover", { method: "POST" });
+        if (!res1.ok) {
+          const errData = await res1.json().catch(() => ({}));
+          throw new Error(errData.detail || "Помилка під час збору оферів з Prom.ua");
+        }
+
+        // Step 2: Matching
+        showProgress("Крок 2/3: AI-зіставлення через Gemini 2.5 Flash...", 66, "Семантичний аналіз характеристик та фільтрація невідповідностей");
+        const res2 = await fetch("/api/actions/match", { method: "POST" });
+        if (!res2.ok) {
+          const errData = await res2.json().catch(() => ({}));
+          throw new Error(errData.detail || "Помилка під час AI-зіставлення оферів");
+        }
+
+        // Step 3: Repricing
+        showProgress("Крок 3/3: Перерахунок рекомендованих цін...", 95, "Розрахунок нових цін з урахуванням мінімальної маржі");
+        const res3 = await fetch("/api/actions/reprice", { method: "POST" });
+        if (!res3.ok) {
+          const errData = await res3.json().catch(() => ({}));
+          throw new Error(errData.detail || "Помилка під час перерахунку цін");
+        }
+
+        // Finalize
+        showProgress("Завершено! Оновлення даних інтерфейсу...", 100);
+        showToast("Повний цикл автопілоту успішно виконано!");
+        await loadData();
+      } catch (err) {
+        console.error(err);
+        showError(`Збій автопілоту: ${err.message || err}`);
+      } finally {
+        hideProgress();
+        setButtonsLoading(false);
+      }
+    }
+
+    // Single Action Execution
+    async function triggerSingleAction(action, loadingMessage) {
+      dismissError();
+      const btnId = `btn-${action}`;
+      setButtonsLoading(true, btnId);
+      showProgress(loadingMessage, 100, "Обробка запиту на сервері...");
+
       try {
         const resp = await fetch(`/api/actions/${action}`, { method: "POST" });
-        const data = await resp.json();
+        const data = await resp.json().catch(() => ({}));
         if (resp.ok) {
           showToast(data.message || "Дію успішно виконано!");
           await loadData();
         } else {
-          showToast(data.detail || "Сталася помилка при виконанні дії", true);
+          showError(`Помилка [${action}]: ${data.detail || 'Сервер повернув помилку'}`);
         }
       } catch (err) {
-        showToast("Помилка зв'язку з сервером: " + err, true);
+        showError(`Помилка зв'язку з сервером: ${err.message || err}`);
+      } finally {
+        hideProgress();
+        setButtonsLoading(false);
       }
     }
 
@@ -266,24 +524,50 @@
     async function applyPrice(productId) {
       try {
         const resp = await fetch(`/api/actions/apply/${productId}`, { method: "POST" });
-        const data = await resp.json();
+        const data = await resp.json().catch(() => ({}));
         if (resp.ok) {
           showToast(data.message || "Ціну успішно оновлено!");
           await loadData();
         } else {
-          showToast(data.detail || "Не вдалося оновити ціну", true);
+          showError(`Не вдалося застосувати ціну: ${data.detail || 'Невідома помилка'}`);
         }
       } catch (err) {
-        showToast("Помилка: " + err, true);
+        showError(`Помилка оновлення ціни: ${err.message || err}`);
       }
+    }
+
+    // Tab Switcher
+    function switchTab(tab) {
+      currentTab = tab;
+      const tabCatalog = document.getElementById("tab-catalog");
+      const tabCompetitors = document.getElementById("tab-competitors");
+      const viewCatalog = document.getElementById("view-catalog");
+      const viewCompetitors = document.getElementById("view-competitors");
+      const searchInput = document.getElementById("search-input");
+
+      if (tab === 'catalog') {
+        tabCatalog.className = "flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold border transition bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-sm";
+        tabCompetitors.className = "flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold border transition border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60";
+        viewCatalog.classList.remove("hidden");
+        viewCompetitors.classList.add("hidden");
+        searchInput.placeholder = "Пошук товарів каталогу за назвою або SKU...";
+      } else {
+        tabCompetitors.className = "flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold border transition bg-cyan-500/10 border-cyan-500/30 text-cyan-400 shadow-sm";
+        tabCatalog.className = "flex items-center space-x-2 px-4 py-2.5 rounded-xl text-xs font-semibold border transition border-transparent text-slate-400 hover:text-slate-200 hover:bg-slate-800/60";
+        viewCatalog.classList.add("hidden");
+        viewCompetitors.classList.remove("hidden");
+        searchInput.placeholder = "Пошук серед зібраних конкурентів за назвою або продавцем...";
+      }
+      handleSearch();
     }
 
     // Fetch and Render Data
     async function loadData() {
       try {
-        const [statsRes, productsRes] = await Promise.all([
+        const [statsRes, productsRes, competitorsRes] = await Promise.all([
           fetch("/api/stats"),
-          fetch("/api/products")
+          fetch("/api/products"),
+          fetch("/api/competitor-offers")
         ]);
 
         if (statsRes.ok) {
@@ -296,26 +580,71 @@
 
         if (productsRes.ok) {
           allProducts = await productsRes.json();
-          renderProducts(allProducts);
+          document.getElementById("tab-catalog-count").textContent = allProducts.length;
         }
+
+        if (competitorsRes.ok) {
+          allCompetitorOffers = await competitorsRes.json();
+          document.getElementById("tab-competitors-count").textContent = allCompetitorOffers.length;
+        }
+
+        handleSearch();
       } catch (err) {
         console.error("Failed to load dashboard data:", err);
+        showError("Не вдалося завантажити дані з сервера: " + err);
       }
     }
 
-    function filterProducts() {
+    // Search Filtering
+    function handleSearch() {
       const q = document.getElementById("search-input").value.toLowerCase().trim();
-      if (!q) {
-        renderProducts(allProducts);
-        return;
+
+      if (currentTab === 'catalog') {
+        if (!q) {
+          renderProducts(allProducts);
+        } else {
+          const filtered = allProducts.filter(p =>
+            (p.title && p.title.toLowerCase().includes(q)) ||
+            (p.sku && p.sku.toLowerCase().includes(q))
+          );
+          renderProducts(filtered);
+        }
+      } else {
+        if (!q) {
+          renderCompetitors(allCompetitorOffers);
+        } else {
+          const filtered = allCompetitorOffers.filter(c =>
+            (c.title && c.title.toLowerCase().includes(q)) ||
+            (c.seller_name && c.seller_name.toLowerCase().includes(q)) ||
+            (c.matched_product_title && c.matched_product_title.toLowerCase().includes(q))
+          );
+          renderCompetitors(filtered);
+        }
       }
-      const filtered = allProducts.filter(p =>
-        (p.title && p.title.toLowerCase().includes(q)) ||
-        (p.sku && p.sku.toLowerCase().includes(q))
-      );
-      renderProducts(filtered);
     }
 
+    // Safe Image Thumbnail Renderer with No-Referrer and Error Fallback
+    function renderImageThumbnail(imgUrl, altText, size = "w-10 h-10") {
+      if (imgUrl) {
+        return `
+          <div class="${size} rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center relative">
+            <img src="${imgUrl}" alt="${altText || ''}" referrerpolicy="no-referrer"
+                 onerror="this.style.display='none'; if(this.nextElementSibling) this.nextElementSibling.style.display='flex';"
+                 class="w-full h-full object-cover">
+            <div style="display:none;" class="w-full h-full flex items-center justify-center bg-slate-800 text-slate-400">
+              <i data-lucide="package" class="w-5 h-5"></i>
+            </div>
+          </div>
+        `;
+      }
+      return `
+        <div class="${size} rounded-lg bg-slate-800 border border-slate-700 flex-shrink-0 flex items-center justify-center text-slate-400">
+          <i data-lucide="package" class="w-5 h-5"></i>
+        </div>
+      `;
+    }
+
+    // Render Tab 1: Products
     function renderProducts(products) {
       const tbody = document.getElementById("products-table-body");
       if (!products || products.length === 0) {
@@ -342,21 +671,40 @@
         // Competitors snippets
         let compHtml = `<span class="text-slate-500 text-[11px]">Немає знайдених оферів</span>`;
         if (p.competitors && p.competitors.length > 0) {
-          compHtml = `<div class="space-y-1">` + p.competitors.slice(0, 3).map(c => `
-            <div class="flex items-center justify-between text-[11px] bg-slate-900/60 px-2 py-1 rounded-md border border-slate-800">
-              <span class="truncate max-w-[140px] text-slate-300" title="${c.title}">${c.seller_name}</span>
-              <a href="${c.url}" target="_blank" class="font-semibold text-cyan-400 hover:underline inline-flex items-center">
+          const previewOffers = p.competitors.slice(0, 2);
+          const remainingCount = p.competitors.length - 2;
+
+          compHtml = `<div class="space-y-1.5">` + previewOffers.map(c => `
+            <div class="flex items-center justify-between text-[11px] bg-slate-900/70 px-2 py-1 rounded-md border border-slate-800">
+              <span class="truncate max-w-[130px] text-slate-300 font-medium" title="${c.title}">${c.seller_name}</span>
+              <a href="${c.url}" target="_blank" class="font-semibold text-cyan-400 hover:underline inline-flex items-center ml-2">
                 ${c.price.toFixed(1)} ₴ <i data-lucide="external-link" class="w-2.5 h-2.5 ml-1 text-slate-400"></i>
               </a>
             </div>
-          `).join('') + (p.competitors.length > 3 ? `<p class="text-[10px] text-slate-500 text-right">+ ще ${p.competitors.length - 3} оферів</p>` : '') + `</div>`;
+          `).join('');
+
+          // Clickable details button
+          if (remainingCount > 0) {
+            compHtml += `
+              <button onclick="openCompetitorsModal(${p.id})" class="text-[10px] font-semibold text-cyan-400 hover:text-cyan-300 hover:underline flex items-center justify-end w-full pt-0.5">
+                + ще ${remainingCount} оферів (всі ${p.competitors.length}) <i data-lucide="chevron-right" class="w-3 h-3 ml-0.5"></i>
+              </button>
+            `;
+          } else {
+            compHtml += `
+              <button onclick="openCompetitorsModal(${p.id})" class="text-[10px] text-slate-400 hover:text-cyan-400 flex items-center justify-end w-full pt-0.5">
+                Детальніше (${p.competitors.length}) <i data-lucide="chevron-right" class="w-3 h-3 ml-0.5"></i>
+              </button>
+            `;
+          }
+          compHtml += `</div>`;
         }
 
         // AI Verdict Badge
         let verdictBadge = `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[11px]">Без аналізу</span>`;
         if (p.match_summary) {
           const m = p.match_summary;
-          const pct = Math.round(m.confidence_score * 100);
+          const pct = Math.round((m.confidence_score || 0) * 100);
           if (m.status === 'approved') {
             verdictBadge = `<span class="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold text-[11px]" title="${m.ai_reasoning || ''}">✓ ${pct}% Схвалено</span>`;
           } else if (m.status === 'rejected') {
@@ -377,9 +725,7 @@
             <!-- Product Info -->
             <td class="py-3.5 px-4">
               <div class="flex items-center space-x-3">
-                <div class="w-10 h-10 rounded-lg bg-slate-800 border border-slate-700 overflow-hidden flex-shrink-0 flex items-center justify-center">
-                  ${p.image_url ? `<img src="${p.image_url}" alt="${p.title}" class="w-full h-full object-cover">` : `<i data-lucide="package" class="w-5 h-5 text-slate-500"></i>`}
-                </div>
+                ${renderImageThumbnail(p.image_url, p.title, "w-10 h-10")}
                 <div class="min-w-0">
                   <p class="font-medium text-white truncate max-w-[280px]" title="${p.title}">${p.title}</p>
                   <p class="text-[11px] text-cyan-400 font-mono">SKU: ${p.sku || 'N/A'}</p>
@@ -426,6 +772,184 @@
       }).join('');
 
       lucide.createIcons();
+    }
+
+    // Render Tab 2: All Competitor Offers
+    function renderCompetitors(offers) {
+      const tbody = document.getElementById("competitors-table-body");
+      if (!offers || offers.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-10 text-center text-slate-500">Оферів конкурентів не знайдено</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = offers.map(c => {
+        // In stock badge
+        const stockBadge = c.is_in_stock
+          ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[10px] font-medium"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1.5"></span>В наявності</span>`
+          : `<span class="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px] font-medium"><span class="w-1.5 h-1.5 rounded-full bg-slate-500 mr-1.5"></span>Немає</span>`;
+
+        // Match status badge
+        let matchBadge = `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[10px]">Не зв'язано</span>`;
+        if (c.match_status === 'approved') {
+          matchBadge = `<span class="px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold text-[10px]" title="${c.ai_reasoning || ''}">✓ Схвалено (${Math.round((c.confidence_score || 0) * 100)}%)</span>`;
+        } else if (c.match_status === 'rejected') {
+          matchBadge = `<span class="px-2 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-semibold text-[10px]" title="${c.ai_reasoning || ''}">✗ Відхилено (${Math.round((c.confidence_score || 0) * 100)}%)</span>`;
+        } else if (c.match_status === 'pending') {
+          matchBadge = `<span class="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold text-[10px]" title="${c.ai_reasoning || ''}">? Очікує (${Math.round((c.confidence_score || 0) * 100)}%)</span>`;
+        }
+
+        return `
+          <tr class="hover:bg-slate-800/30 transition">
+            <!-- Image -->
+            <td class="py-3 px-4">
+              ${renderImageThumbnail(c.image_url, c.title, "w-10 h-10")}
+            </td>
+
+            <!-- Competitor Title -->
+            <td class="py-3 px-4">
+              <a href="${c.url}" target="_blank" class="font-medium text-white hover:text-cyan-400 transition truncate max-w-[320px] block" title="${c.title}">
+                ${c.title}
+              </a>
+              <span class="text-[10px] text-slate-500 font-mono">ID: ${c.id}</span>
+            </td>
+
+            <!-- Seller Name -->
+            <td class="py-3 px-4">
+              <div class="flex items-center space-x-1.5 text-slate-300">
+                <i data-lucide="store" class="w-3.5 h-3.5 text-slate-500 flex-shrink-0"></i>
+                <span class="truncate max-w-[140px]" title="${c.seller_name}">${c.seller_name}</span>
+              </div>
+            </td>
+
+            <!-- Price -->
+            <td class="py-3 px-4">
+              <span class="text-sm font-bold text-cyan-400 font-mono">${c.price.toFixed(1)} ₴</span>
+            </td>
+
+            <!-- Stock -->
+            <td class="py-3 px-4">
+              ${stockBadge}
+            </td>
+
+            <!-- Matched Product & Status -->
+            <td class="py-3 px-4">
+              <div class="space-y-1">
+                <p class="text-slate-200 truncate max-w-[200px] font-medium" title="${c.matched_product_title || 'Не зв\'язано'}">
+                  ${c.matched_product_title || '<span class="text-slate-500">Не прив\'язано</span>'}
+                </p>
+                <div>${matchBadge}</div>
+                ${c.ai_reasoning ? `<p class="text-[10px] text-slate-400 truncate max-w-[200px]" title="${c.ai_reasoning}">${c.ai_reasoning}</p>` : ''}
+              </div>
+            </td>
+
+            <!-- Link -->
+            <td class="py-3 px-4 text-center">
+              <a href="${c.url}" target="_blank" class="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-cyan-400 text-xs border border-slate-700 transition" title="Відкрити офер на Prom.ua">
+                <span>Prom</span>
+                <i data-lucide="external-link" class="w-3 h-3 text-slate-400"></i>
+              </a>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      lucide.createIcons();
+    }
+
+    // Open Competitors Modal for Product
+    function openCompetitorsModal(productId) {
+      const product = allProducts.find(p => p.id === productId);
+      if (!product) return;
+
+      document.getElementById("modal-product-title").textContent = product.title;
+      document.getElementById("modal-product-sku").textContent = product.sku || 'N/A';
+      document.getElementById("modal-product-category").textContent = product.category || 'Без категорії';
+      document.getElementById("modal-current-price").textContent = `${product.current_price.toFixed(1)} ₴`;
+      document.getElementById("modal-cost-price").textContent = `${product.cost_price.toFixed(1)} ₴`;
+      document.getElementById("modal-floor-price").textContent = `${product.floor_price.toFixed(1)} ₴`;
+
+      const listContainer = document.getElementById("modal-competitors-list");
+      const competitors = product.competitors || [];
+      document.getElementById("modal-offers-count").textContent = competitors.length;
+
+      if (competitors.length === 0) {
+        listContainer.innerHTML = `
+          <div class="py-12 text-center text-slate-500">
+            <i data-lucide="info" class="w-8 h-8 mx-auto mb-2 text-slate-600"></i>
+            Для цього товару ще не зібрано жодної пропозиції конкурентів
+          </div>
+        `;
+      } else {
+        listContainer.innerHTML = competitors.map(c => {
+          // Stock
+          const stock = c.is_in_stock
+            ? `<span class="inline-flex items-center text-emerald-400 text-[11px] font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 mr-1"></span>В наявності</span>`
+            : `<span class="inline-flex items-center text-rose-400 text-[11px] font-semibold"><span class="w-1.5 h-1.5 rounded-full bg-rose-400 mr-1"></span>Немає в наявності</span>`;
+
+          // Match status badge
+          let verdictBadge = `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 text-[11px]">Без аналізу</span>`;
+          const pct = Math.round((c.confidence_score || 0) * 100);
+          if (c.match_status === 'approved') {
+            verdictBadge = `<span class="px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-semibold text-[11px]">✓ Схвалено (${pct}%)</span>`;
+          } else if (c.match_status === 'rejected') {
+            verdictBadge = `<span class="px-2.5 py-0.5 rounded-full bg-rose-500/10 border border-rose-500/30 text-rose-400 font-semibold text-[11px]">✗ Відхилено (${pct}%)</span>`;
+          } else {
+            verdictBadge = `<span class="px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold text-[11px]">? Очікує (${pct}%)</span>`;
+          }
+
+          return `
+            <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 space-y-3 hover:border-slate-700 transition">
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start space-x-3 min-w-0">
+                  ${renderImageThumbnail(c.image_url, c.title, "w-12 h-12")}
+                  <div class="min-w-0">
+                    <a href="${c.url}" target="_blank" class="font-medium text-white hover:text-cyan-400 transition text-xs line-clamp-2" title="${c.title}">
+                      ${c.title}
+                    </a>
+                    <div class="flex items-center space-x-3 text-[11px] text-slate-400 mt-1">
+                      <span class="flex items-center"><i data-lucide="store" class="w-3 h-3 mr-1 text-slate-500"></i> ${c.seller_name}</span>
+                      <span>${stock}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="text-right flex-shrink-0">
+                  <p class="text-base font-bold text-cyan-400 font-mono">${c.price.toFixed(1)} ₴</p>
+                  <div class="mt-1">${verdictBadge}</div>
+                </div>
+              </div>
+
+              <!-- AI Reasoning Box -->
+              <div class="bg-[#0b1120] border border-slate-800/90 rounded-lg p-3 text-xs space-y-1">
+                <div class="flex items-center space-x-1.5 text-indigo-400 font-semibold text-[11px]">
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                  <span>Пояснення Gemini AI (${c.match_method || 'rule-based'}):</span>
+                </div>
+                <p class="text-slate-300 text-xs leading-relaxed italic">
+                  ${c.ai_reasoning || 'Пояснення відсутнє або офер очікує повної AI-валідації.'}
+                </p>
+              </div>
+
+              <div class="flex justify-end pt-1">
+                <a href="${c.url}" target="_blank" class="inline-flex items-center space-x-1.5 text-xs text-cyan-400 hover:text-cyan-300 hover:underline">
+                  <span>Переглянути пропозицію на Prom.ua</span>
+                  <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                </a>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      const modal = document.getElementById("competitors-modal");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      lucide.createIcons();
+    }
+
+    function closeCompetitorsModal() {
+      const modal = document.getElementById("competitors-modal");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
     }
   </script>
 </body>

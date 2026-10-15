@@ -1,11 +1,11 @@
-<?xml version="1.0" encoding="UTF-8"?>
+<?xml version='1.0' encoding='UTF-8'?>
 <yml_catalog date="2026-10-15 10:00">
     <shop>
         <name>TechStore UA</name>
         <company>TechStore Ukraine</company>
         <url>https://techstore.prom.ua</url>
         <currencies>
-            <currency id="UAH" rate="1"/>
+            <currency id="UAH" rate="1" />
         </currencies>
         <categories>
             <category id="101">Павербанки та портативні батареї</category>
@@ -21,7 +21,7 @@
                 <price>2699</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>101</categoryId>
-                <picture>https://images.prom.ua/1001_baseus_blade.jpg</picture>
+                <picture>https://images.prom.ua/3993730294_w200_h200_umb-portativnoe-zaryadnoe.jpg</picture>
                 <vendor>Baseus</vendor>
                 <param name="Собівартість">1850</param>
             </offer>
@@ -31,7 +31,7 @@
                 <price>999</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>101</categoryId>
-                <picture>https://images.prom.ua/1002_xiaomi_redmi_20000.jpg</picture>
+                <picture>https://images.prom.ua/6064249628_w200_h200_originalnyj-xiaomi-redmi.jpg</picture>
                 <vendor>Xiaomi</vendor>
                 <cost_price>720</cost_price>
             </offer>
@@ -41,7 +41,7 @@
                 <price>349</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>102</categoryId>
-                <picture>https://images.prom.ua/1003_hoco_c80a.jpg</picture>
+                <picture>https://images.prom.ua/6992579052_w200_h200_setevoe-zaryadnoe-ustrojstvo.jpg</picture>
                 <vendor>Hoco</vendor>
                 <param name="Закупка">220</param>
             </offer>
@@ -51,7 +51,7 @@
                 <price>1299</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>102</categoryId>
-                <picture>https://images.prom.ua/1004_baseus_gan5_65w.jpg</picture>
+                <picture>https://images.prom.ua/4320161993_w200_h200_moschnoe-zaryadnoe-ustrojstvo.jpg</picture>
                 <vendor>Baseus</vendor>
                 <param name="Собівартість">890</param>
             </offer>
@@ -61,7 +61,7 @@
                 <price>899</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>102</categoryId>
-                <picture>https://images.prom.ua/1005_apple_20w.jpg</picture>
+                <picture>https://images.prom.ua/6105299939_w200_h200_zaryadnoe-ustrojstvo-apple.jpg</picture>
                 <vendor>Apple</vendor>
                 <cost_price>650</cost_price>
             </offer>
@@ -71,7 +71,7 @@
                 <price>249</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>103</categoryId>
-                <picture>https://images.prom.ua/1006_baseus_cafule_lightning.jpg</picture>
+                <picture>https://images.prom.ua/6163233091_w200_h200_kabel-baseus-cafule.jpg</picture>
                 <vendor>Baseus</vendor>
             </offer>
             <offer id="1007" available="true">
@@ -80,7 +80,7 @@
                 <price>279</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>103</categoryId>
-                <picture>https://images.prom.ua/1007_baseus_tungsten_100w.jpg</picture>
+                <picture>https://images.prom.ua/6088180105_w200_h200_kabel-baseus-tungsten.jpg</picture>
                 <vendor>Baseus</vendor>
                 <param name="Собівартість">170</param>
             </offer>
@@ -90,7 +90,7 @@
                 <price>129</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>103</categoryId>
-                <picture>https://images.prom.ua/1008_hoco_x20.jpg</picture>
+                <picture>https://images.prom.ua/3803855350_w200_h200_kabel-hoco-x20.jpg</picture>
                 <vendor>Hoco</vendor>
             </offer>
             <offer id="1009" available="true">
@@ -99,7 +99,7 @@
                 <price>1599</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>104</categoryId>
-                <picture>https://images.prom.ua/1009_baseus_bowie_m2.jpg</picture>
+                <picture>https://images.prom.ua/7190860600_w200_h200_besprovodnye-naushniki-baseus.jpg</picture>
                 <vendor>Baseus</vendor>
                 <cost_price>1100</cost_price>
             </offer>
@@ -109,7 +109,7 @@
                 <price>699</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>104</categoryId>
-                <picture>https://images.prom.ua/1010_redmi_buds_4_active.jpg</picture>
+                <picture>https://images.prom.ua/6470418130_w200_h200_besprovodnye-naushniki-xiaomi.jpg</picture>
                 <vendor>Xiaomi</vendor>
             </offer>
             <offer id="1011" available="true">
@@ -118,7 +118,7 @@
                 <price>9499</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>104</categoryId>
-                <picture>https://images.prom.ua/1011_airpods_pro_2.jpg</picture>
+                <picture>https://images.prom.ua/7087039187_w200_h200_naushniki-apple-mtjv3tya.jpg</picture>
                 <vendor>Apple</vendor>
                 <param name="Собівартість">7800</param>
             </offer>
@@ -128,7 +128,7 @@
                 <price>499</price>
                 <currencyId>UAH</currencyId>
                 <categoryId>105</categoryId>
-                <picture>https://images.prom.ua/1012_baseus_magpro.jpg</picture>
+                <picture>https://images.prom.ua/6708988066_w200_h200_derzhatel-v-avto.jpg</picture>
                 <vendor>Baseus</vendor>
             </offer>
         </offers>

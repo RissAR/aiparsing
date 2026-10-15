@@ -176,7 +176,55 @@ def get_products(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
     return result
 
 
-# 3. Action Endpoints
+# 3. Competitor Offers Endpoint
+@app.get("/api/competitor-offers")
+def get_competitor_offers(db: Session = Depends(get_db)) -> list[dict[str, Any]]:
+    offers = (
+        db.query(CompetitorOffer)
+        .order_by(CompetitorOffer.id.asc())
+        .all()
+    )
+
+    result = []
+    for o in offers:
+        matched_product_id = None
+        matched_product_title = None
+        match_status = None
+        confidence_score = None
+        ai_reasoning = None
+
+        if o.matches:
+            # Prefer approved match, otherwise first match
+            m = next((m for m in o.matches if m.status == "approved"), o.matches[0])
+            if m.product:
+                matched_product_id = m.product.id
+                matched_product_title = m.product.title
+            match_status = m.status
+            confidence_score = m.confidence_score
+            ai_reasoning = m.ai_reasoning
+
+        result.append(
+            {
+                "id": o.id,
+                "title": o.title,
+                "seller_name": o.seller_name or "Невідомий продавець",
+                "price": o.price,
+                "url": o.url,
+                "image_url": o.image_url,
+                "is_in_stock": o.is_in_stock,
+                "scraped_at": o.scraped_at.isoformat() if o.scraped_at else None,
+                "matched_product_id": matched_product_id,
+                "matched_product_title": matched_product_title,
+                "match_status": match_status,
+                "confidence_score": confidence_score,
+                "ai_reasoning": ai_reasoning,
+            }
+        )
+
+    return result
+
+
+# 4. Action Endpoints
 @app.post("/api/actions/run-all")
 def run_all(db: Session = Depends(get_db)) -> dict[str, Any]:
     """Run full autopilot cycle: Discovery -> Matching -> Repricing."""
