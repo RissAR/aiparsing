@@ -1,129 +1,114 @@
-# ТЗ №1: Ініціалізація проєкту та Схема даних (Data Layer)
+# ТЗ №2: Модуль імпорту власного каталогу (XML/YML Ingestion)
 
 ## Мета
-Створити базовий каркас Python-проєкту та реляційну схему даних на SQLite через SQLAlchemy для збереження власних товарів, пропозицій конкурентів з Prom.ua, результатів матчингу та історії розрахованих цін.
+Реалізувати надійний сервіс парсингу та імпорту товарних фідів Prom.ua (формат XML/YML) у базу даних `products` з підтримкою операцій додавання нових та оновлення існуючих позицій (Upsert), а також підготувати реалістичний тестовий набір даних (електроніка та мобільні аксесуари).
 
 ---
 
-## Стек технологій
-- **Мова:** Python 3.11+
-- **ORM / База даних:** SQLAlchemy 2.0+ / SQLite (`data/app.db`)
-- **Валідація / Типізація:** Pydantic v2
-- **Управління оточенням:** `requirements.txt` + `venv`
+## Стек технологій та залежності
+- **Парсинг XML:** `lxml>=5.0.0` (додати до `requirements.txt`)
+- **База даних:** SQLAlchemy 2.0+ (моделі з Кроку 1)
+- **CLI аргументи:** стандартна бібліотека `argparse`
 
 ---
 
-## Структура файлів до створення
+## Структура файлів до створення / модифікації
 ```text
 /home/dofi/Dev/aiparsing/
-├── .gitignore
-├── requirements.txt
+├── requirements.txt                   # Додати lxml>=5.0.0
+├── data/
+│   └── samples/
+│       └── prom_feed.xml              # Тестовий XML/YML фід Prom.ua на 10-12 товарів
 ├── src/
-│   ├── __init__.py
-│   ├── config.py
-│   └── database/
+│   └── services/
 │       ├── __init__.py
-│       ├── connection.py
-│       └── models.py
+│       └── feed_importer.py           # Сервіс парсингу та upsert-логіки
 └── scripts/
-    └── init_db.py
+    └── import_feed.py                 # CLI скрипт запуску імпорту
 ```
 
 ---
 
-## Вимоги до реалізації
+## Детальні вимоги до реалізації
 
-### 1. `requirements.txt`
-Зафіксувати мінімально необхідні залежності:
-- `sqlalchemy>=2.0.0`
-- `pydantic>=2.0.0`
-- `pydantic-settings>=2.0.0`
-- `python-dotenv>=1.0.0`
+### 1. Оновлення `requirements.txt`
+Додати:
+- `lxml>=5.0.0`
 
-### 2. `.gitignore`
-Включити:
-- `__pycache__/`, `*.pyc`
-- `venv/`, `.env`
-- `data/*.db` (база даних не комітиться)
+### 2. Тестовий фід `data/samples/prom_feed.xml`
+Створити валідний XML-фід за стандартом YML / Prom.ua, що містить секцію `<yml_catalog>` $\rightarrow$ `<shop>` $\rightarrow$ `<offers>` із 10–12 популярними товарами електроніки та мобільних аксесуарів (Baseus, Hoco, Xiaomi, Apple accessories).
+Кожен `<offer>` повинен містити:
+- `id` (унікальний числовий ідентифікатор офера в Prom)
+- `available="true"`
+- `<name>`: Реалістична комерційна назва (наприклад, *"Павербанк Baseus Blade 100W 20000mAh Black (PPDGL-01)"*, *"Мережевий зарядний пристрій Hoco C80A Dual Port 20W White"*, *"Кабель Type-C to Lightning Baseus Cafule 20W 1m"*)
+- `<vendorCode>`: Реальний артикул виробника (SKU)
+- `<price>`: Роздрібна ціна (число)
+- `<currencyId>UAH</currencyId>`
+- `<categoryId>`: ID категорії
+- `<picture>`: Посилання на фото
+- `<vendor>`: Бренд (Baseus, Hoco тощо)
+- Опціонально для частини товарів: `<param name="Собівартість">1800</param>` або `<cost_price>1800</cost_price>` для тестування парсингу закупівлі.
 
-### 3. `src/config.py`
-- Конфігурація шляхів через Pydantic `BaseSettings`:
-  - `DB_PATH`: шлях до файлу БД (за замовчуванням `data/app.db`).
-  - Створення папки `data/`, якщо вона відсутня.
+### 3. Сервіс імпорту `src/services/feed_importer.py`
+Створити клас `FeedImporter`:
+- **Метод `import_from_file(file_path: str) -> ImportResult`:**
+  - Парсить XML за допомогою `lxml.etree`.
+  - Валідує наявність обов'язкових полів: `name`, `price`, `vendorCode` (якщо `vendorCode` відсутній — брати `offer.get('id')` як fallback).
+  - **Логіка собівартості (`cost_price`):**
+    1. Перевіряє наявність тегу `<cost_price>` або `<param name="Собівартість">` / `<param name="Закупка">`.
+    2. Якщо собівартості у фіді немає — вираховує автоматично як `price * 0.75` (дефолтна маржа 25%).
+  - **Upsert логіка (по полю `sku`):**
+    - Якщо товар із таким `sku` вже існує в БД:
+      - Оновлює: `current_price`, `title`, `image_url`, `is_active` (`available == 'true'`), `updated_at`.
+      - Собівартість оновлює тільки якщо вона явно передана у фіді.
+      - Збільшує лічильник `updated`.
+    - Якщо товару немає:
+      - Створює новий запис `Product` у БД.
+      - Збільшує лічильник `created`.
+  - Повертає dataclass або Pydantic-об'єкт `ImportResult`:
+    - `total_offers: int`
+    - `created: int`
+    - `updated: int`
+    - `errors: list[str]`
 
-### 4. `src/database/connection.py`
-- Ініціалізація `engine` для SQLite (`sqlite:///...`).
-- Фабрика сесій `sessionmaker(autocommit=False, autoflush=False, bind=engine)`.
-- Базовий декларативний клас `Base = declarative_base()`.
-- Допоміжна функція `get_db()` (генератор сесії для подальшого використання у сервісах/FastAPI).
-
-### 5. `src/database/models.py`
-Описати 4 ключові таблиці зі зв'язками (ForeignKeys) та індексами:
-
-1. **`products` (Наші власні товари):**
-   - `id`: Integer, Primary Key, autoincrement.
-   - `sku`: String, unique=True, index=True (артикул товару).
-   - `title`: String, nullable=False.
-   - `category`: String, nullable=True.
-   - `current_price`: Float, nullable=False.
-   - `cost_price`: Float, nullable=False (собівартість).
-   - `min_margin_percent`: Float, default=15.0 (мінімальна маржа у %).
-   - `image_url`: String, nullable=True.
-   - `is_active`: Boolean, default=True.
-   - `created_at`: DateTime(timezone=True), default=datetime.utcnow.
-   - `updated_at`: DateTime(timezone=True), onupdate=datetime.utcnow.
-
-2. **`competitor_offers` (Пропозиції конкурентів із Prom.ua):**
-   - `id`: Integer, Primary Key, autoincrement.
-   - `source`: String, default="prom.ua" (джерело).
-   - `external_id`: String, nullable=True, index=True (ID товару на маркетплейсі).
-   - `title`: String, nullable=False (назва товару у конкурента).
-   - `price`: Float, nullable=False.
-   - `seller_name`: String, nullable=True (назва магазину на Prom).
-   - `url`: String, nullable=False (пряме посилання).
-   - `image_url`: String, nullable=True.
-   - `is_in_stock`: Boolean, default=True (наявність).
-   - `scraped_at`: DateTime(timezone=True), default=datetime.utcnow.
-
-3. **`product_matches` (Зв'язок нашого товару та товару конкурента):**
-   - `id`: Integer, Primary Key, autoincrement.
-   - `product_id`: Integer, ForeignKey("products.id"), index=True.
-   - `competitor_offer_id`: Integer, ForeignKey("competitor_offers.id"), index=True.
-   - `match_method`: String (наприклад: "exact_sku", "fuzzy_title", "ai_gemini").
-   - `confidence_score`: Float, nullable=False (від 0.0 до 1.0).
-   - `status`: String, default="pending" ("pending", "approved", "rejected").
-   - `ai_reasoning`: Text, nullable=True (коротке обґрунтування від моделі).
-   - `matched_at`: DateTime(timezone=True), default=datetime.utcnow.
-
-4. **`price_recommendations` (Рекомендовані ціни та історія):**
-   - `id`: Integer, Primary Key, autoincrement.
-   - `product_id`: Integer, ForeignKey("products.id"), index=True.
-   - `current_price`: Float, nullable=False.
-   - `min_market_price`: Float, nullable=False (найнижча валідна ціна серед схвалених конкурентів).
-   - `recommended_price`: Float, nullable=False.
-   - `status`: String, default="pending" ("pending", "applied", "dismissed").
-   - `calculated_at`: DateTime(timezone=True), default=datetime.utcnow.
-
-### 6. `scripts/init_db.py`
-Скрипт перевірки:
-- Створює таблиці в БД (`Base.metadata.create_all(bind=engine)`).
-- Додає 1 тестовий товар у `products` (наприклад, чохол чи павербанк).
-- Робить вибірку доданого товару з БД та виводить у консоль підтвердження успішного запису.
+### 4. CLI скрипт `scripts/import_feed.py`
+Скрипт із підтримкою аргументів:
+- Аргумент командного рядка:
+  `--file`: обов'язковий або дефолтний шлях до файлу (за замовчуванням `data/samples/prom_feed.xml`).
+- Виводить у консоль інформативний прогрес та підсумок:
+  ```text
+  Імпорт фіду: data/samples/prom_feed.xml
+  ----------------------------------------
+  Всього оферів у фіді: 12
+  Успішно створено нових: 12
+  Оновлено існуючих: 0
+  Помилок: 0
+  ----------------------------------------
+  Імпорт успішно завершено!
+  ```
 
 ---
 
-## Критерії приймання та перевірка (Verification)
-1. Створено віртуальне середовище, встановлено залежності з `requirements.txt`.
-2. Виконання команди:
+## Критерії приймання та верифікація (Verification)
+1. Встановлено нові залежності:
    ```bash
-   python scripts/init_db.py
+   pip install -r requirements.txt
    ```
-3. Скрипт успішно завершується з кодом 0, у папці `data/` з'являється файл `app.db`, а в консолі виводиться тестовий запис.
+2. Перший запуск імпорту:
+   ```bash
+   python scripts/import_feed.py --file data/samples/prom_feed.xml
+   ```
+   *Очікуваний результат:* створено 10-12 нових товарів, 0 помилок.
+3. Повторний запуск імпорту (перевірка ідемпотентності / Upsert):
+   ```bash
+   python scripts/import_feed.py --file data/samples/prom_feed.xml
+   ```
+   *Очікуваний результат:* створено 0, оновлено 10-12, дублікатів у базі не з'явилося.
 
 ---
 
 ## Формат звіту після виконання
-1. Список створених файлів.
-2. Результат виконання тестового скрипту `init_db.py`.
-3. Єдина команда для збереження змін:
-   `git add . && git commit -m "feat: initialize project structure and database schema" && git push origin main`
+1. Список створених/модифікованих файлів.
+2. Лог виконання команд верифікації (перший та другий запуск).
+3. Єдина команда для git фіксації:
+   `git add . && git commit -m "feat: implement XML/YML catalog ingestion service and CLI" && git push origin main`

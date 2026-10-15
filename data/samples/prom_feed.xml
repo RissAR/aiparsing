@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<yml_catalog date="2026-10-15 10:00">
+    <shop>
+        <name>TechStore UA</name>
+        <company>TechStore Ukraine</company>
+        <url>https://techstore.prom.ua</url>
+        <currencies>
+            <currency id="UAH" rate="1"/>
+        </currencies>
+        <categories>
+            <category id="101">Павербанки та портативні батареї</category>
+            <category id="102">Зарядні пристрої</category>
+            <category id="103">Кабелі синхронізації</category>
+            <category id="104">Бездротові навушники</category>
+            <category id="105">Чохли та автотримачі</category>
+        </categories>
+        <offers>
+            <offer id="1001" available="true">
+                <name>Павербанк Baseus Blade 100W 20000mAh Black (PPDGL-01)</name>
+                <vendorCode>PPDGL-01</vendorCode>
+                <price>2699</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>101</categoryId>
+                <picture>https://images.prom.ua/1001_baseus_blade.jpg</picture>
+                <vendor>Baseus</vendor>
+                <param name="Собівартість">1850</param>
+            </offer>
+            <offer id="1002" available="true">
+                <name>Павербанк Xiaomi Redmi Power Bank 20000mAh 18W Fast Charge White (VXN4285GL)</name>
+                <vendorCode>VXN4285GL</vendorCode>
+                <price>999</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>101</categoryId>
+                <picture>https://images.prom.ua/1002_xiaomi_redmi_20000.jpg</picture>
+                <vendor>Xiaomi</vendor>
+                <cost_price>720</cost_price>
+            </offer>
+            <offer id="1003" available="true">
+                <name>Мережевий зарядний пристрій Hoco C80A Dual Port 20W Type-C / USB White</name>
+                <vendorCode>C80A-WHT</vendorCode>
+                <price>349</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>102</categoryId>
+                <picture>https://images.prom.ua/1003_hoco_c80a.jpg</picture>
+                <vendor>Hoco</vendor>
+                <param name="Закупка">220</param>
+            </offer>
+            <offer id="1004" available="true">
+                <name>Мережевий зарядний пристрій Baseus GaN5 Pro Fast Charger 65W Black (CCGP120201)</name>
+                <vendorCode>CCGP120201</vendorCode>
+                <price>1299</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>102</categoryId>
+                <picture>https://images.prom.ua/1004_baseus_gan5_65w.jpg</picture>
+                <vendor>Baseus</vendor>
+                <param name="Собівартість">890</param>
+            </offer>
+            <offer id="1005" available="true">
+                <name>Зарядний пристрій Apple 20W USB-C Power Adapter (MHJE3ZM/A)</name>
+                <vendorCode>MHJE3ZM/A</vendorCode>
+                <price>899</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>102</categoryId>
+                <picture>https://images.prom.ua/1005_apple_20w.jpg</picture>
+                <vendor>Apple</vendor>
+                <cost_price>650</cost_price>
+            </offer>
+            <offer id="1006" available="true">
+                <name>Кабель Type-C to Lightning Baseus Cafule 20W 1m Black (CATLKLF-G1)</name>
+                <vendorCode>CATLKLF-G1</vendorCode>
+                <price>249</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>103</categoryId>
+                <picture>https://images.prom.ua/1006_baseus_cafule_lightning.jpg</picture>
+                <vendor>Baseus</vendor>
+            </offer>
+            <offer id="1007" available="true">
+                <name>Кабель Type-C to Type-C Baseus Tungsten Gold 100W 1m Black (CAWJ000001)</name>
+                <vendorCode>CAWJ000001</vendorCode>
+                <price>279</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>103</categoryId>
+                <picture>https://images.prom.ua/1007_baseus_tungsten_100w.jpg</picture>
+                <vendor>Baseus</vendor>
+                <param name="Собівартість">170</param>
+            </offer>
+            <offer id="1008" available="true">
+                <name>Кабель USB to Type-C Hoco X20 Flash 2m White</name>
+                <vendorCode>X20-TC-2M</vendorCode>
+                <price>129</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>103</categoryId>
+                <picture>https://images.prom.ua/1008_hoco_x20.jpg</picture>
+                <vendor>Hoco</vendor>
+            </offer>
+            <offer id="1009" available="true">
+                <name>Бездротові навушники Baseus Bowie M2+ ANC TWS Black (NGTW140001)</name>
+                <vendorCode>NGTW140001</vendorCode>
+                <price>1599</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>104</categoryId>
+                <picture>https://images.prom.ua/1009_baseus_bowie_m2.jpg</picture>
+                <vendor>Baseus</vendor>
+                <cost_price>1100</cost_price>
+            </offer>
+            <offer id="1010" available="true">
+                <name>Бездротові навушники Xiaomi Redmi Buds 4 Active Black (BHR6992GL)</name>
+                <vendorCode>BHR6992GL</vendorCode>
+                <price>699</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>104</categoryId>
+                <picture>https://images.prom.ua/1010_redmi_buds_4_active.jpg</picture>
+                <vendor>Xiaomi</vendor>
+            </offer>
+            <offer id="1011" available="true">
+                <name>Бездротові навушники Apple AirPods Pro 2 with MagSafe Case USB-C (MTJV3TY/A)</name>
+                <vendorCode>MTJV3TY/A</vendorCode>
+                <price>9499</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>104</categoryId>
+                <picture>https://images.prom.ua/1011_airpods_pro_2.jpg</picture>
+                <vendor>Apple</vendor>
+                <param name="Собівартість">7800</param>
+            </offer>
+            <offer id="1012" available="true">
+                <name>Магнітний тримач для телефону в авто Baseus MagPro Series Black (C40151300111-00)</name>
+                <vendorCode>C40151300111-00</vendorCode>
+                <price>499</price>
+                <currencyId>UAH</currencyId>
+                <categoryId>105</categoryId>
+                <picture>https://images.prom.ua/1012_baseus_magpro.jpg</picture>
+                <vendor>Baseus</vendor>
+            </offer>
+        </offers>
+    </shop>
+</yml_catalog>
