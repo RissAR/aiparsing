@@ -1,30 +1,28 @@
-# ТЗ №2: Модуль імпорту власного каталогу (XML/YML Ingestion)
+# ТЗ №3: Модуль пошуку та збору конкурентів на Prom.ua (Discovery & Scraping)
 
 ## Мета
-Реалізувати надійний сервіс парсингу та імпорту товарних фідів Prom.ua (формат XML/YML) у базу даних `products` з підтримкою операцій додавання нових та оновлення існуючих позицій (Upsert), а також підготувати реалістичний тестовий набір даних (електроніка та мобільні аксесуари).
+Реалізувати скрапер публічної пошукової видачі Prom.ua на основі стабільних селекторів `data-qaid` та сервіс пошуку конкурентів (`DiscoveryService`), який бере наші товари з БД `products`, знаходить за ними відповідні пропозиції на Prom.ua та зберігає їх у таблицю `competitor_offers`.
 
 ---
 
 ## Стек технологій та залежності
-- **Парсинг XML:** `lxml>=5.0.0` (додати до `requirements.txt`)
-- **База даних:** SQLAlchemy 2.0+ (моделі з Кроку 1)
-- **CLI аргументи:** стандартна бібліотека `argparse`
+- **HTTP-клієнт:** `httpx>=0.27.0` (додати до `requirements.txt`)
+- **HTML-парсинг:** `lxml>=5.0.0` (використовуємо `lxml.html`)
+- **База даних:** SQLAlchemy 2.0+ (`Product`, `CompetitorOffer`)
+- **CLI:** `argparse`
 
 ---
 
 ## Структура файлів до створення / модифікації
 ```text
 /home/dofi/Dev/aiparsing/
-├── requirements.txt                   # Додати lxml>=5.0.0
-├── data/
-│   └── samples/
-│       └── prom_feed.xml              # Тестовий XML/YML фід Prom.ua на 10-12 товарів
+├── requirements.txt                   # Додати httpx>=0.27.0
 ├── src/
 │   └── services/
-│       ├── __init__.py
-│       └── feed_importer.py           # Сервіс парсингу та upsert-логіки
+│       ├── prom_scraper.py            # HTTP-клієнт та парсер HTML-видачі Prom.ua
+│       └── discovery_service.py       # Оркестратор пошуку для товарів з БД
 └── scripts/
-    └── import_feed.py                 # CLI скрипт запуску імпорту
+    └── discover_competitors.py        # CLI скрипт для запуску пошуку конкурентів
 ```
 
 ---
@@ -33,82 +31,86 @@
 
 ### 1. Оновлення `requirements.txt`
 Додати:
-- `lxml>=5.0.0`
+- `httpx>=0.27.0`
 
-### 2. Тестовий фід `data/samples/prom_feed.xml`
-Створити валідний XML-фід за стандартом YML / Prom.ua, що містить секцію `<yml_catalog>` $\rightarrow$ `<shop>` $\rightarrow$ `<offers>` із 10–12 популярними товарами електроніки та мобільних аксесуарів (Baseus, Hoco, Xiaomi, Apple accessories).
-Кожен `<offer>` повинен містити:
-- `id` (унікальний числовий ідентифікатор офера в Prom)
-- `available="true"`
-- `<name>`: Реалістична комерційна назва (наприклад, *"Павербанк Baseus Blade 100W 20000mAh Black (PPDGL-01)"*, *"Мережевий зарядний пристрій Hoco C80A Dual Port 20W White"*, *"Кабель Type-C to Lightning Baseus Cafule 20W 1m"*)
-- `<vendorCode>`: Реальний артикул виробника (SKU)
-- `<price>`: Роздрібна ціна (число)
-- `<currencyId>UAH</currencyId>`
-- `<categoryId>`: ID категорії
-- `<picture>`: Посилання на фото
-- `<vendor>`: Бренд (Baseus, Hoco тощо)
-- Опціонально для частини товарів: `<param name="Собівартість">1800</param>` або `<cost_price>1800</cost_price>` для тестування парсингу закупівлі.
+### 2. Скрапер Prom.ua `src/services/prom_scraper.py`
+Створити клас `PromScraper`:
+- **Конфігурація запиту:**
+  - `User-Agent`: актуальний браузерний рядок (наприклад, `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36`).
+  - `Accept-Language`: `uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7`.
+  - Таймаут запиту: 10–15 секунд.
+- **Метод `search(query: str, max_results: int = 5) -> list[dict]`:**
+  - URL пошуку: `https://prom.ua/ua/search?search_term={quote(query)}`.
+  - Парсинг HTML через `lxml.html.fromstring`.
+  - Пошук блоків карток за XPath: `//*[@data-qaid="product_block"]`.
+  - Для кожного блоку витягнути:
+    1. **Назва товару:** `.//[@data-qaid="product_name"]` (текст).
+    2. **Ціна:** `.//*[@data-qaid="product_price"]` — очистити від пробілів, нерозривних пробілів `\xa0` та знака `₴`, перетворити у `float`. Якщо ціну не вдалося розпарсити — пропускати.
+    3. **Продавець:** `.//*[@data-qaid="company_name"]` (текст).
+    4. **Наявність:** `.//*[@data-qaid="product_presence"]` (перевірка чи містить слова `наявності`, `відправки`, `в наявності` $\rightarrow$ `is_in_stock: bool`).
+    5. **Посилання:** `.//*[@data-qaid="product_link"]/@href` або fallback `.//a[contains(@href, "/p")]/@href` $\rightarrow$ нормалізувати через `urllib.parse.urljoin("https://prom.ua", href)`.
+    6. **Зображення:** `.//img/@src` (якщо є).
+    7. **External ID:** витягнути з URL або data-атрибутів (наприклад, число після `-p` або параметр `?p=...`).
+  - Повертати список словників `RawCompetitorOffer` розміром до `max_results`.
+  - Безпечна обробка помилок (HTTP 4xx/5xx або таймаут не повинні викидати фатальний виняток, а повертати пустий список та логувати попередження).
 
-### 3. Сервіс імпорту `src/services/feed_importer.py`
-Створити клас `FeedImporter`:
-- **Метод `import_from_file(file_path: str) -> ImportResult`:**
-  - Парсить XML за допомогою `lxml.etree`.
-  - Валідує наявність обов'язкових полів: `name`, `price`, `vendorCode` (якщо `vendorCode` відсутній — брати `offer.get('id')` як fallback).
-  - **Логіка собівартості (`cost_price`):**
-    1. Перевіряє наявність тегу `<cost_price>` або `<param name="Собівартість">` / `<param name="Закупка">`.
-    2. Якщо собівартості у фіді немає — вираховує автоматично як `price * 0.75` (дефолтна маржа 25%).
-  - **Upsert логіка (по полю `sku`):**
-    - Якщо товар із таким `sku` вже існує в БД:
-      - Оновлює: `current_price`, `title`, `image_url`, `is_active` (`available == 'true'`), `updated_at`.
-      - Собівартість оновлює тільки якщо вона явно передана у фіді.
-      - Збільшує лічильник `updated`.
-    - Якщо товару немає:
-      - Створює новий запис `Product` у БД.
-      - Збільшує лічильник `created`.
-  - Повертає dataclass або Pydantic-об'єкт `ImportResult`:
-    - `total_offers: int`
-    - `created: int`
-    - `updated: int`
-    - `errors: list[str]`
+### 3. Сервіс Discovery `src/services/discovery_service.py`
+Створити клас `DiscoveryService`:
+- **Метод `discover_for_product(db: Session, product: Product, max_offers: int = 5) -> int`:**
+  - Формує пошуковий запит: якщо є валідний артикул `product.sku` (не порожній) — шукати за комбінацією `SKU` або за `title` (очищеним від зайвих символів).
+  - Викликає `PromScraper.search(query, max_results=max_offers)`.
+  - Для кожної знайденої пропозиції:
+    - Перевіряє, чи вже існує запис у `competitor_offers` для даного `product_id` з таким самим `url`.
+    - Якщо існує — оновлює `price`, `is_in_stock`, `scraped_at`.
+    - Якщо новий — створює новий запис `CompetitorOffer`.
+  - Зберігає зміни в БД (`db.commit()`).
+  - Повертає кількість збережених/оновлених оферів.
+- **Метод `discover_all(db: Session, limit_products: int = None, offers_per_product: int = 5, delay_seconds: float = 1.0)`:**
+  - Проходить по активних товарах (`is_active == True`) з обмеженням `limit_products`.
+  - Між запитами робить `time.sleep(delay_seconds)` для захисту від блокування.
 
-### 4. CLI скрипт `scripts/import_feed.py`
-Скрипт із підтримкою аргументів:
-- Аргумент командного рядка:
-  `--file`: обов'язковий або дефолтний шлях до файлу (за замовчуванням `data/samples/prom_feed.xml`).
-- Виводить у консоль інформативний прогрес та підсумок:
+### 4. CLI скрипт `scripts/discover_competitors.py`
+Аргументи командного рядка:
+- `--limit`: кількість товарів з каталогу для обробки (за замовчуванням `3`, для повного прогону можна передати більше).
+- `--offers-per-product`: скільки конкурентів збирати для кожного товару (за замовчуванням `5`).
+- `--delay`: пауза між товарами в секундах (за замовчуванням `1.5`).
+- Інформативний вивід у консоль:
   ```text
-  Імпорт фіду: data/samples/prom_feed.xml
-  ----------------------------------------
-  Всього оферів у фіді: 12
-  Успішно створено нових: 12
-  Оновлено існуючих: 0
-  Помилок: 0
-  ----------------------------------------
-  Імпорт успішно завершено!
+  Запуск пошуку конкурентів на Prom.ua...
+  Товарів до обробки: 3 | Оферів на товар: 5 | Затримка: 1.5s
+  ------------------------------------------------------------
+  [1/3] Наш товар: Павербанк Baseus Blade 100W 20000mAh Black (SKU: PPDGL-01)
+        Пошуковий запит: 'PPDGL-01'
+        -> Знайдено оферів: 5
+        -> Збережено в базу (діапазон цін: 3299.0 - 4043.0 UAH)
+  [2/3] ...
+  ------------------------------------------------------------
+  Пошук завершено. Всього зібрано пропозицій: 15
   ```
 
 ---
 
 ## Критерії приймання та верифікація (Verification)
-1. Встановлено нові залежності:
+1. Встановлено залежності:
    ```bash
-   pip install -r requirements.txt
+   venv/bin/pip install -r requirements.txt
    ```
-2. Перший запуск імпорту:
+2. Запуск збору для перших 3-х товарів:
    ```bash
-   python scripts/import_feed.py --file data/samples/prom_feed.xml
+   venv/bin/python scripts/discover_competitors.py --limit 3 --offers-per-product 5 --delay 1.0
    ```
-   *Очікуваний результат:* створено 10-12 нових товарів, 0 помилок.
-3. Повторний запуск імпорту (перевірка ідемпотентності / Upsert):
+3. Перевірка збереження даних у БД:
+   Виконати перевірочний однорядковий скрипт:
    ```bash
-   python scripts/import_feed.py --file data/samples/prom_feed.xml
+   venv/bin/python -c "from src.database.connection import SessionLocal; from src.database.models import CompetitorOffer; db = SessionLocal(); count = db.query(CompetitorOffer).count(); print(f'Total competitor offers in DB: {count}'); assert count > 0; db.close()"
    ```
-   *Очікуваний результат:* створено 0, оновлено 10-12, дублікатів у базі не з'явилося.
+   *Очікуваний результат:* у таблиці `competitor_offers` з'явилося > 0 записів з реальними цінами та посиланнями.
 
 ---
 
 ## Формат звіту після виконання
 1. Список створених/модифікованих файлів.
-2. Лог виконання команд верифікації (перший та другий запуск).
-3. Єдина команда для git фіксації:
-   `git add . && git commit -m "feat: implement XML/YML catalog ingestion service and CLI" && git push origin main`
+2. Лог виконання команди `discover_competitors.py`.
+3. Результат перевірки кількості записів у БД.
+4. Єдина команда для git фіксації:
+   `git add . && git commit -m "feat: implement Prom.ua scraper and competitor discovery service" && git push origin main`
